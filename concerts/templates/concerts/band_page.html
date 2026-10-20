@@ -32,8 +32,8 @@ footer a { color: inherit; }
   .action { width: 6rem; text-align: right; }
 }
 </style>
-{% for concert in concerts %}
-<script type="application/ld+json">{{ concert.json_ld }}</script>
+{% for event in events %}
+<script type="application/ld+json">{{ event }}</script>
 {% endfor %}
 </head>
 <body>

@@ -1,0 +1,51 @@
+[project]
+name = "otr"
+version = "0.1.0"
+description = "Concert dates tool for bands: enter dates once, publish them anywhere"
+license = "AGPL-3.0-only"
+requires-python = ">=3.12"
+dependencies = [
+    "django>=6.1,<6.2",
+    "httpx>=0.28",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=9",
+    "pytest-django>=4.14",
+    "mypy>=2.4",
+    "django-stubs>=6.1,<6.2",
+    "ruff>=0.17",
+]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["concerts*", "config*"]
+
+[tool.setuptools.package-data]
+concerts = ["templates/**/*.html"]
+
+[tool.pytest.ini_options]
+DJANGO_SETTINGS_MODULE = "config.settings"
+testpaths = ["tests"]
+
+[tool.mypy]
+plugins = ["mypy_django_plugin.main"]
+check_untyped_defs = true
+exclude = "^concerts/migrations/"
+
+[tool.django-stubs]
+django_settings_module = "config.settings"
+
+[tool.ruff]
+line-length = 120
+extend-exclude = ["concerts/migrations"]
+
+[tool.ruff.lint]
+# Defaults (pyflakes, pycodestyle errors) plus import sorting
+extend-select = ["I"]
+# Django's admin and Meta use class-level lists (list_display, ordering…) by design
+ignore = ["RUF012"]

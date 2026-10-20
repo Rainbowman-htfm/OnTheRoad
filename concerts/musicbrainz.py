@@ -1,8 +1,11 @@
 """Read venues ("places") from MusicBrainz. Data under CC0; read only, never write."""
+
 import re
 import threading
 import time
+from collections.abc import Callable
 from contextlib import nullcontext
+from typing import Any, TypedDict
 
 import httpx
 from django.conf import settings
@@ -11,7 +14,7 @@ from django.conf import settings
 ADDRESS = re.compile(r"^(?P<street>.*?)[,\s]*\b(?P<postal_code>\d{5})\s+(?P<city>.+)$")
 RETRY_STATUSES = {429, 500, 502, 503, 504}
 MIN_INTERVAL = 1.0  # seconds between requests, MusicBrainz's rule
-_sleep = time.sleep  # replaced in tests
+_sleep: Callable[[float], None] = time.sleep  # replaced in tests
 
 _lock = threading.Lock()
 _last_request = 0.0
@@ -21,15 +24,33 @@ class MusicBrainzError(Exception):
     pass
 
 
-def make_client(transport=None):
+class VenueFields(TypedDict):
+    """A MusicBrainz place translated to our Venue fields, plus its type for display."""
+
+    musicbrainz_id: str
+    name: str
+    type: str
+    address: str
+    postal_code: str
+    city: str
+    latitude: str
+    longitude: str
+
+
+class PlaceFields(VenueFields):
+    website: str
+
+
+def make_client(transport: httpx.BaseTransport | None = None) -> httpx.Client:
     """transport: lets tests replace the network with httpx.MockTransport."""
     contact = settings.MUSICBRAINZ_CONTACT
     user_agent = f"OTR/0.1 ( {contact} )" if contact else "OTR/0.1"
-    return httpx.Client(base_url="https://musicbrainz.org/ws/2/", headers={"User-Agent": user_agent},
-                        timeout=10, transport=transport)
+    return httpx.Client(
+        base_url="https://musicbrainz.org/ws/2/", headers={"User-Agent": user_agent}, timeout=10, transport=transport
+    )
 
 
-def get_json(client, path, params, retries=2):
+def get_json(client: httpx.Client, path: str, params: dict[str, Any], retries: int = 2) -> Any:
     """GET path, at most one request per second, waiting 2 then 4 s between retries."""
     global _last_request
     for attempt in range(retries + 1):
@@ -50,11 +71,11 @@ def get_json(client, path, params, retries=2):
         _sleep(2 ** (attempt + 1))
 
 
-def _fetch(client, path, params):
+def _fetch(client: httpx.Client | None, path: str, params: dict[str, Any]) -> Any:
     try:
         # A client created here is closed after the request; one passed in belongs to the caller
-        with nullcontext(client) if client else make_client() as client:
-            return get_json(client, path, params)
+        with nullcontext(client) if client else make_client() as http:
+            return get_json(http, path, params)
     except httpx.HTTPStatusError as error:
         if error.response.status_code in RETRY_STATUSES:
             raise MusicBrainzError("MusicBrainz is busy, try again in a few seconds.") from error
@@ -63,7 +84,7 @@ def _fetch(client, path, params):
         raise MusicBrainzError("MusicBrainz could not be reached.") from error
 
 
-def _venue_fields(place):
+def _venue_fields(place: dict[str, Any]) -> VenueFields:
     """Map a MusicBrainz place to our Venue fields."""
     address = place.get("address", "")
     match = ADDRESS.match(address)
@@ -81,20 +102,25 @@ def _venue_fields(place):
     }
 
 
-def _quoted(text):
+def _quoted(text: str) -> str:
     return '"' + text.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
 
-def search_places(name, city, client=None):
+def search_places(name: str, city: str, client: httpx.Client | None = None) -> list[VenueFields]:
     query = f"place:{_quoted(name)}" + (f" AND area:{_quoted(city)}" if city else "")
     data = _fetch(client, "place/", {"query": query, "limit": 10})
     return [_venue_fields(place) for place in data["places"]]
 
 
-def place(mbid, client=None):
+def place(mbid: str, client: httpx.Client | None = None) -> PlaceFields:
     """One place with its official website, if MusicBrainz knows it."""
     data = _fetch(client, f"place/{mbid}", {"inc": "url-rels"})
-    fields = _venue_fields(data)
-    fields["website"] = next((relation["url"]["resource"] for relation in data.get("relations", [])
-                              if relation["type"] == "official homepage" and not relation["ended"]), "")
-    return fields
+    website = next(
+        (
+            relation["url"]["resource"]
+            for relation in data.get("relations", [])
+            if relation["type"] == "official homepage" and not relation["ended"]
+        ),
+        "",
+    )
+    return {**_venue_fields(data), "website": website}

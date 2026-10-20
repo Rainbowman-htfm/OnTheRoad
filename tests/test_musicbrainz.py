@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs, urlparse
 
 import httpx
@@ -14,33 +15,34 @@ SEARCH = json.loads((FIXTURES / "musicbrainz_search_maroquinerie.json").read_tex
 PLACE = json.loads((FIXTURES / "musicbrainz_place_maroquinerie.json").read_text())
 
 
-def mock_transport(*answers, requests=None):
+def mock_transport(*answers: Any, requests: list[httpx.Request] | None = None) -> httpx.MockTransport:
     """Fake network: answers are returned in order, each a JSON body or an HTTP status code."""
-    answers = list(answers)
+    pending = list(answers)
 
-    def handler(request):
+    def handler(request: httpx.Request) -> httpx.Response:
         if requests is not None:
             requests.append(request)
-        answer = answers.pop(0)
+        answer = pending.pop(0)
         return httpx.Response(answer) if isinstance(answer, int) else httpx.Response(200, json=answer)
+
     return httpx.MockTransport(handler)
 
 
-def mb_client(*answers, requests=None):
+def mb_client(*answers: Any, requests: list[httpx.Request] | None = None) -> httpx.Client:
     return musicbrainz.make_client(transport=mock_transport(*answers, requests=requests))
 
 
 @pytest.fixture(autouse=True)
-def waits(monkeypatch):
+def waits(monkeypatch: pytest.MonkeyPatch) -> list[float]:
     """Records the pauses instead of waiting."""
-    waits = []
+    waits: list[float] = []
     monkeypatch.setattr(musicbrainz, "_sleep", waits.append)
     return waits
 
 
 def test_search_request_and_result(settings):
     settings.MUSICBRAINZ_CONTACT = "contact@example.org"
-    requests = []
+    requests: list[httpx.Request] = []
     [place] = musicbrainz.search_places("Maroquinerie", "Paris", client=mb_client(SEARCH, requests=requests))
     request = requests[0]
     assert request.headers["user-agent"] == "OTR/0.1 ( contact@example.org )"
@@ -60,13 +62,13 @@ def test_search_request_and_result(settings):
 
 
 def test_quotes_in_names_are_escaped():
-    requests = []
+    requests: list[httpx.Request] = []
     musicbrainz.search_places('The "Big" Room', "", client=mb_client({"places": []}, requests=requests))
     assert requests[0].url.params["query"] == 'place:"The \\"Big\\" Room"'
 
 
 def test_place_has_official_website():
-    requests = []
+    requests: list[httpx.Request] = []
     fields = musicbrainz.place(MAROQUINERIE, client=mb_client(PLACE, requests=requests))
     assert requests[0].url.params["inc"] == "url-rels"
     assert fields["website"] == "http://www.lamaroquinerie.fr/"
@@ -83,9 +85,14 @@ def test_still_busy_after_retries():
 
 
 def test_address_without_french_postal_code_kept_whole():
-    fields = musicbrainz._venue_fields({"id": "x", "name": "Paradiso", "address": "Weteringschans 6-8, Amsterdam",
-                                        "area": {"name": "Amsterdam"}})
-    assert (fields["address"], fields["postal_code"], fields["city"]) == ("Weteringschans 6-8, Amsterdam", "", "Amsterdam")
+    fields = musicbrainz._venue_fields(
+        {"id": "x", "name": "Paradiso", "address": "Weteringschans 6-8, Amsterdam", "area": {"name": "Amsterdam"}}
+    )
+    assert (fields["address"], fields["postal_code"], fields["city"]) == (
+        "Weteringschans 6-8, Amsterdam",
+        "",
+        "Amsterdam",
+    )
 
 
 @pytest.fixture
@@ -96,6 +103,7 @@ def admin_musicbrainz(monkeypatch):
     def use(*answers):
         transport = mock_transport(*answers)
         monkeypatch.setattr(musicbrainz, "make_client", lambda: make_client(transport=transport))
+
     return use
 
 

@@ -63,11 +63,22 @@ def test_music_event_block(band, venue):
     assert sold_out["@type"] == "MusicEvent"
     assert sold_out["location"]["address"]["addressLocality"] == "Ris-Orangis"
     assert sold_out["location"]["geo"]["latitude"] == 48.6513
-    assert sold_out["performer"] == {"@type": "MusicGroup", "name": "Damantra", "url": "https://damantra.fr",
-                                     "sameAs": ["https://www.instagram.com/damantra"]}
+    assert sold_out["performer"] == {
+        "@type": "MusicGroup",
+        "name": "Damantra",
+        "url": "https://damantra.fr",
+        "sameAs": ["https://www.instagram.com/damantra"],
+    }
     assert sold_out["offers"]["availability"] == "https://schema.org/SoldOut"
     assert cancelled["eventStatus"] == "https://schema.org/EventCancelled"
     assert "offers" not in cancelled
+
+
+def test_query_count_does_not_grow_with_concerts(band, venue, django_assert_num_queries):
+    for days in range(1, 6):
+        add_concert(band, venue, days=days)
+    with django_assert_num_queries(2):  # the concerts with their venues, then the band's links
+        public.band_page(band)
 
 
 def test_json_ld_cannot_close_script_tag(band):

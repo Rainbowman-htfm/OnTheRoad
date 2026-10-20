@@ -1,20 +1,25 @@
+from typing import TYPE_CHECKING, Any, ClassVar
+
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.db import models
 from django.utils import timezone
 
+if TYPE_CHECKING:
+    from django.db.models.fields.related_descriptors import ManyRelatedManager, RelatedManager
 
-class AccountManager(BaseUserManager):
+
+class AccountManager(BaseUserManager["Account"]):
     """Creates accounts from an email address, since there is no username."""
 
-    def create_user(self, email, password=None, **fields):
+    def create_user(self, email: str, password: str | None = None, **fields: Any) -> "Account":
         account = self.model(email=self.normalize_email(email), **fields)
         # Without a password, the account can only log in through an emailed link (step 4)
         account.set_password(password)
         account.save(using=self._db)
         return account
 
-    def create_superuser(self, email, password=None, **fields):
+    def create_superuser(self, email: str, password: str | None = None, **fields: Any) -> "Account":
         fields.setdefault("is_staff", True)
         fields.setdefault("is_superuser", True)
         return self.create_user(email, password, **fields)
@@ -23,15 +28,18 @@ class AccountManager(BaseUserManager):
 class Account(AbstractUser):
     """A person who can log in, identified by their email address."""
 
-    username = None
+    username = None  # type: ignore[assignment]  # removed: the email is the identifier
     email = models.EmailField(unique=True)
 
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
 
-    objects = AccountManager()
+    # Reverse relations, created by Django from the other side; declared for editors and type checkers
+    bands: "ManyRelatedManager[Band, Membership]"
 
-    def __str__(self):
+    objects: ClassVar[AccountManager] = AccountManager()  # type: ignore[assignment]  # no username to ask for
+
+    def __str__(self) -> str:
         return self.email
 
 
@@ -44,10 +52,14 @@ class Band(models.Model):
     website = models.URLField(blank=True)
     members = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Membership", related_name="bands", blank=True)
 
+    # Reverse relations, created by Django from the other side; declared for editors and type checkers
+    links: "RelatedManager[BandLink]"
+    concerts: "RelatedManager[Concert]"
+
     class Meta:
         ordering = ["name"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.name
 
 
@@ -60,7 +72,7 @@ class BandLink(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=["band", "url"], name="unique_band_link")]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.url
 
 
@@ -73,7 +85,7 @@ class Membership(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=["account", "band"], name="unique_membership")]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.account} → {self.band}"
 
 
@@ -91,10 +103,14 @@ class Venue(models.Model):
     musicbrainz_id = models.UUIDField("MusicBrainz ID", null=True, blank=True, unique=True)
     website = models.URLField(blank=True)
 
+    # Reverse relations, created by Django from the other side; declared for editors and type checkers
+    links: "RelatedManager[VenueLink]"
+    concerts: "RelatedManager[Concert]"
+
     class Meta:
         ordering = ["city", "name"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.name} ({self.city})"
 
 
@@ -105,7 +121,7 @@ class VenueLink(models.Model):
     class Meta:
         constraints = [models.UniqueConstraint(fields=["venue", "url"], name="unique_venue_link")]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return self.url
 
 
@@ -129,5 +145,5 @@ class Concert(models.Model):
     class Meta:
         ordering = ["starts_at"]
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.band} — {self.venue} — {timezone.localtime(self.starts_at):%Y-%m-%d}"
