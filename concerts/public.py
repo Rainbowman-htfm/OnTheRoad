@@ -131,6 +131,7 @@ def music_event(concert: Concert, same_as: list[str]) -> dict[str, Any]:
         "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
         "location": location,
         "performer": performer,
+        **({"isAccessibleForFree": True} if concert.free_entry else {}),
     }
     if concert.ticket_url:
         sold_out = concert.status == Concert.Status.SOLD_OUT
@@ -194,8 +195,10 @@ def widget_page(band: Band, concerts: list[Concert]) -> str:
 
 
 def describe(concert: Concert) -> str:
-    """Extra information for feeds: status if not planned, and support acts."""
+    """Extra information for feeds: status if not planned, free entry and support acts."""
     parts = [] if concert.status == Concert.Status.PLANNED else [Concert.Status(concert.status).label.capitalize()]
+    if concert.free_entry:
+        parts.append("Free entry")
     if concert.support_acts:
         parts.append(f"with {concert.support_acts}")
     return " · ".join(parts)

@@ -206,3 +206,15 @@ def test_style_preview_shows_the_unsaved_style(admin_client, band):
 def test_style_pages_require_admin(client, band):
     for url in (f"/admin/concerts/band/{band.pk}/style/", f"/admin/concerts/band/{band.pk}/style/preview/"):
         assert client.get(url).status_code == 302  # to the login page
+
+
+def test_free_entry_shown_when_there_is_no_ticket_link(site, band, venue):
+    free = add_concert(band, venue, days=3, free_entry=True)
+    page = built(site, band, "index.html")
+    assert "Free entry" in page and "Tickets" not in page
+    assert public.music_event(free, [])["isAccessibleForFree"] is True
+    assert "Free entry" in built(site, band, "concerts.ics")
+    # With a link (a free booking), the link is shown; "free" stays in the data and feeds
+    free.ticket_url = "https://tickets.example/1"
+    free.save()
+    assert "Tickets" in built(site, band, "index.html")

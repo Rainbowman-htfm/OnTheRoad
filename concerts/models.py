@@ -169,6 +169,7 @@ class Concert(models.Model):
     time_tba = models.BooleanField("time not announced yet", default=False)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PLANNED)
     ticket_url = models.URLField(blank=True)
+    free_entry = models.BooleanField(default=False)
     support_acts = models.CharField(max_length=300, blank=True)
     announced_at = models.DateTimeField(default=timezone.now)
 
