@@ -139,6 +139,8 @@ class Concert(models.Model):
     starts_at = models.DateTimeField()
     # Optional: often unknown when a concert is announced
     ends_at = models.DateTimeField(null=True, blank=True)
+    # The day is known but not the time: outputs show the date only, never the time in starts_at
+    time_tba = models.BooleanField("time not announced yet", default=False)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PLANNED)
     ticket_url = models.URLField(blank=True)
     support_acts = models.CharField(max_length=300, blank=True)

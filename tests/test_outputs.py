@@ -66,6 +66,20 @@ def test_end_time_in_calendar_and_music_event(site, band, venue):
     assert music_event["endDate"] == timezone.localtime(concert.ends_at).isoformat()
 
 
+def test_time_not_announced(site, band, venue):
+    concert = add_concert(band, venue, days=3, time_tba=True)
+    day = timezone.localtime(concert.starts_at).date()
+    assert "time TBA" in built(site, band, "index.html")
+    widget = built(site, band, "widget/index.html")
+    assert f'datetime="{day.isoformat()}"' in widget  # no invented time in the markup either
+    assert re.search(r"<span class=\"time\">[A-Z][a-z]{2}, time TBA</span>", widget)
+    [event] = Calendar.from_ical(built(site, band, "concerts.ics")).walk("VEVENT")
+    assert event.decoded("dtstart") == day  # a date, not a date and time: an all-day event
+    assert event.decoded("dtend") == day + timedelta(days=1)
+    [music_event] = json.loads((site / "damantra" / "events.json").read_text())
+    assert music_event["startDate"] == day.isoformat()
+
+
 def test_rss_lists_upcoming_concerts_latest_announced_first(site, band, venue):
     add_concert(band, venue, days=-3)
     first = add_concert(band, venue, days=20, announced_at=timezone.now() - timedelta(days=5))

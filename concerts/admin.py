@@ -46,7 +46,7 @@ class VenueLinkInline(admin.TabularInline):
 class ConcertInline(admin.TabularInline):
     model = Concert
     extra = 1
-    fields = ["starts_at", "ends_at", "venue", "status", "ticket_url", "support_acts"]
+    fields = ["starts_at", "time_tba", "ends_at", "venue", "status", "ticket_url", "support_acts"]
     autocomplete_fields = ["venue"]
 
 

@@ -3,7 +3,7 @@ page, widget, iCal and RSS feeds, and the MusicEvent data as JSON."""
 
 import json
 import shutil
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from typing import Any
 from urllib.parse import urlparse
 
@@ -82,8 +82,17 @@ def music_event(concert: Concert, same_as: list[str]) -> dict[str, Any]:
         "@context": "https://schema.org",
         "@type": "MusicEvent",
         "name": f"{band.name} at {venue.name}",
-        "startDate": timezone.localtime(concert.starts_at).isoformat(),
-        **({"endDate": timezone.localtime(concert.ends_at).isoformat()} if concert.ends_at else {}),
+        # A date alone when the time is not announced, which schema.org accepts
+        "startDate": (
+            timezone.localtime(concert.starts_at).date().isoformat()
+            if concert.time_tba
+            else timezone.localtime(concert.starts_at).isoformat()
+        ),
+        **(
+            {"endDate": timezone.localtime(concert.ends_at).isoformat()}
+            if concert.ends_at and not concert.time_tba
+            else {}
+        ),
         "eventStatus": "https://schema.org/" + EVENT_STATUS[concert.status],
         "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
         "location": location,
@@ -162,9 +171,15 @@ def calendar(band: Band) -> bytes:
         event = Event()
         event.add("uid", concert_uid(concert))
         event.add("dtstamp", now)
-        event.add("dtstart", concert.starts_at)
-        if concert.ends_at:
-            event.add("dtend", concert.ends_at)
+        if concert.time_tba:
+            # All-day event: calendars show the day without inventing a time
+            day = timezone.localtime(concert.starts_at).date()
+            event.add("dtstart", day)
+            event.add("dtend", day + timedelta(days=1))
+        else:
+            event.add("dtstart", concert.starts_at)
+            if concert.ends_at:
+                event.add("dtend", concert.ends_at)
         event.add("summary", f"{band.name} at {venue.name}")
         city = f"{venue.postal_code} {venue.city}".strip()
         event.add("location", ", ".join(part for part in (venue.name, venue.address, city) if part))

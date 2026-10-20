@@ -18,12 +18,13 @@ a { color: inherit; }
 .venue { display: block; }
 .details span:not(:first-child):not(:empty)::before { content: " · "; }
 .action { flex: none; }
+.time { white-space: nowrap; }
 .tickets { display: inline-block; background: var(--accent); color: var(--on-accent); border-radius: var(--radius); padding: .3rem .8rem; text-decoration: none; }
 .cancelled .venue, .cancelled .details { text-decoration: line-through; opacity: .5; }
 .status-cancelled { color: #c22; font-weight: 600; }
 /* Wide space: venue, city, time, support act and distance line up in columns */
 @media (min-width: 720px) {
-  .info { display: grid; grid-template-columns: 1fr 9rem 6rem 11rem 4rem; align-items: center; gap: .8rem; }
+  .info { display: grid; grid-template-columns: 1fr 9rem 8rem 9rem 4rem; align-items: center; gap: .8rem; }
   .venue { display: inline; }
   .details { display: contents; opacity: 1; }
   .details span { opacity: .7; }
