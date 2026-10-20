@@ -23,11 +23,13 @@ def rebuild(band_ids: Iterable[int]) -> None:
 @receiver(post_save, sender=Band)
 def band_saved(sender: type[Band], instance: Band, **kwargs: Any) -> None:
     rebuild([instance.pk])
+    transaction.on_commit(public.build_home)
 
 
 @receiver(post_delete, sender=Band)
 def band_deleted(sender: type[Band], instance: Band, **kwargs: Any) -> None:
     transaction.on_commit(lambda: public.remove_band(instance.slug))
+    transaction.on_commit(public.build_home)
 
 
 @receiver([post_save, post_delete], sender=Concert)

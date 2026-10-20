@@ -108,6 +108,24 @@ def test_saving_a_concert_rewrites_the_page(band, venue, public_dir, django_capt
     assert not (public_dir / "damantra").exists()
 
 
+def test_home_page_lists_bands(band, public_dir, django_capture_on_commit_callbacks):
+    with django_capture_on_commit_callbacks(execute=True):
+        Band.objects.create(name="DVM Spero", slug="dvm-spero")
+    home = (public_dir / "index.html").read_text()
+    assert '<a href="damantra/">Damantra</a>' in home
+    assert '<a href="dvm-spero/">DVM Spero</a>' in home
+    with django_capture_on_commit_callbacks(execute=True):
+        Band.objects.get(slug="dvm-spero").delete()
+    assert "DVM Spero" not in (public_dir / "index.html").read_text()
+
+
+def test_public_files_are_served(client, band, public_dir):
+    public.build_all()
+    assert client.get("/").status_code == 200  # the home page
+    assert client.get("/damantra/").status_code == 200
+    assert client.get("/damantra/events.json")["Access-Control-Allow-Origin"] == "*"
+
+
 def test_build_all_removes_pages_of_renamed_bands(band, public_dir):
     (public_dir / "old-slug").mkdir()
     public.build_all()

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Concert dates</title>
+{% include "concerts/_style.html" %}
+<style>
+body { max-width: 54rem; margin: 0 auto; padding: 1rem; }
+.bands { list-style: none; padding: 0; }
+.bands li { padding: var(--pad) 0; border-bottom: 1px solid var(--line); }
+</style>
+</head>
+<body>
+<h1>Concert dates</h1>
+<p class="muted">Upcoming concerts of the bands on this site.</p>
+{% if bands %}
+<ul class="bands">
+{% for band in bands %}<li><a href="{{ band.slug }}/">{{ band.name }}</a></li>
+{% endfor %}</ul>
+{% else %}
+<p>No bands yet.</p>
+{% endif %}
+</body>
+</html>

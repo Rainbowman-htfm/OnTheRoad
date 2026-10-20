@@ -26,5 +26,6 @@ if settings.SERVE_FILES:
     # ponytail: Django serving files is fine for a demo; a web server (Apache, Caddy…) should do it at scale
     urlpatterns += [
         path("static/<path:path>", serve, {"document_root": str(settings.STATIC_ROOT)}),
+        path("", public_file, {"path": ""}),  # "<path:path>" needs at least one character
         path("<path:path>", public_file),
     ]

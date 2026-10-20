@@ -84,6 +84,17 @@ def test_still_busy_after_retries():
         musicbrainz.place(MAROQUINERIE, client=mb_client(503, 503, 503))
 
 
+def test_country_after_the_city_is_dropped():
+    fields = musicbrainz._venue_fields(
+        {"id": "x", "name": "Glazart", "address": "7-15 avenue de la porte de la Villette 75019 Paris, France"}
+    )
+    assert (fields["address"], fields["postal_code"], fields["city"]) == (
+        "7-15 avenue de la porte de la Villette",
+        "75019",
+        "Paris",
+    )
+
+
 def test_address_without_french_postal_code_kept_whole():
     fields = musicbrainz._venue_fields(
         {"id": "x", "name": "Paradiso", "address": "Weteringschans 6-8, Amsterdam", "area": {"name": "Amsterdam"}}

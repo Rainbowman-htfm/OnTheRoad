@@ -10,8 +10,9 @@ from typing import Any, TypedDict
 import httpx
 from django.conf import settings
 
-# French address ending: "23 rue Boyer, 75020 Paris" → street, postal code, city
-ADDRESS = re.compile(r"^(?P<street>.*?)[,\s]*\b(?P<postal_code>\d{5})\s+(?P<city>.+)$")
+# French address ending: "23 rue Boyer, 75020 Paris" → street, postal code, city; anything after the city
+# (", France") is dropped
+ADDRESS = re.compile(r"^(?P<street>.*?)[,\s]*\b(?P<postal_code>\d{5})\s+(?P<city>[^,]+?)\s*(,.*)?$")
 RETRY_STATUSES = {429, 500, 502, 503, 504}
 MIN_INTERVAL = 1.0  # seconds between requests, MusicBrainz's rule
 _sleep: Callable[[float], None] = time.sleep  # replaced in tests

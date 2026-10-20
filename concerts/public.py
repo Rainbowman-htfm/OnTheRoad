@@ -218,9 +218,16 @@ def remove_band(slug: str) -> None:
     shutil.rmtree(settings.PUBLIC_DIR / slug, ignore_errors=True)
 
 
-def build_all() -> None:
-    """Rebuild every band's files; also drops past dates and folders of renamed bands."""
+def build_home() -> None:
+    """Home page listing the bands, at the root of PUBLIC_DIR."""
     settings.PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
+    html = render_to_string("concerts/home.html", {"bands": Band.objects.all()})
+    (settings.PUBLIC_DIR / "index.html").write_text(html, encoding="utf-8")
+
+
+def build_all() -> None:
+    """Rebuild every band's files and the home page; also drops past dates and folders of renamed bands."""
+    build_home()
     slugs: set[str] = set()
     for band in Band.objects.all():
         build_band(band)
