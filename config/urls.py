@@ -12,7 +12,7 @@ urlpatterns: list[URLPattern | URLResolver] = [
 
 @xframe_options_exempt  # the widget must be allowed in other sites' iframes
 def public_file(request: HttpRequest, path: str) -> HttpResponse | FileResponse:
-    """Development only: serve the generated public files, so runserver alone is enough to try them."""
+    """Serve the generated public files (see SERVE_FILES)."""
     if path == "" or path.endswith("/"):
         path += "index.html"
     response = serve(request, path, document_root=str(settings.PUBLIC_DIR))
@@ -22,5 +22,9 @@ def public_file(request: HttpRequest, path: str) -> HttpResponse | FileResponse:
     return response
 
 
-if settings.DEBUG:
-    urlpatterns.append(path("<path:path>", public_file))
+if settings.SERVE_FILES:
+    # ponytail: Django serving files is fine for a demo; a web server (Apache, Caddy…) should do it at scale
+    urlpatterns += [
+        path("static/<path:path>", serve, {"document_root": str(settings.STATIC_ROOT)}),
+        path("<path:path>", public_file),
+    ]
