@@ -1,0 +1,53 @@
+{% extends "admin/base_site.html" %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">Home</a> › <a href="{% url 'admin:concerts_band_changelist' %}">Bands</a> › <a href="{% url 'admin:concerts_band_change' band.pk %}">{{ band.name }}</a> › Page style
+</div>
+{% endblock %}
+{% block extrastyle %}{{ block.super }}
+<style>
+.style-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: .6rem 1.2rem; max-width: 60rem; }
+.style-grid label { font-weight: 600; }
+.style-grid .help { display: block; }
+.style iframe { width: 100%; max-width: 60rem; height: 32rem; border: 1px dashed #aaa; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="style">
+<p>Your public page's style, also the starting point of your website widget (<a href="{% url 'admin:concerts_band_share' band.pk %}">Share</a>). An unticked colour follows the theme.</p>
+<form method="post" id="style">{% csrf_token %}
+{{ form.non_field_errors }}
+<div class="style-grid">
+  <div>{{ form.theme.label_tag }}<br>{{ form.theme }}</div>
+  <div>{{ form.font.label_tag }}<br>{{ form.font }}</div>
+  <div>{{ form.corners.label_tag }}<br>{{ form.corners }}</div>
+  {% for color, use in colors %}
+  <div>{{ color.label_tag }}<br>{{ color }} <label>{{ use }} use it</label>{{ color.errors }}{% if color.help_text %}<span class="help">{{ color.help_text }}</span>{% endif %}</div>
+  {% endfor %}
+</div>
+<p><input type="submit" class="default" value="Save"></p>
+</form>
+
+<h3>Preview</h3>
+<iframe id="preview" title="Page preview"></iframe>
+</div>
+
+<script>
+(function () {
+  var form = document.getElementById("style"), preview = document.getElementById("preview");
+  var url = "{% url 'admin:concerts_band_style_preview' band.pk %}";
+  function update() {
+    var params = new URLSearchParams(new FormData(form));
+    params.delete("csrfmiddlewaretoken");
+    preview.src = url + "?" + params;
+  }
+  // Picking a colour ticks its box
+  form.querySelectorAll("input[type=color]").forEach(function (input) {
+    input.addEventListener("input", function () { form.elements["use_" + input.name].checked = true; });
+  });
+  // "change" rather than "input": a colour picker sends "input" at every move, which would reload the page each time
+  form.addEventListener("change", update);
+  update();
+})();
+</script>
+{% endblock %}

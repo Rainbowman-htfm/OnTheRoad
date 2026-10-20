@@ -23,12 +23,13 @@
 </ul>
 
 <h2>Widget for your website</h2>
+<p>The widget starts with your page's style (<a href="{% url 'admin:concerts_band_style' band.pk %}">Page style</a>); change only what should differ on your website.</p>
 <form id="settings" class="share-grid">
-  <div><label for="theme">Theme</label><select id="theme"><option value="">Light</option><option value="dark">Dark</option><option value="transparent">Transparent</option></select></div>
-  <div><label for="accent">Accent colour</label><input type="color" id="accent" value="#111111"> <label><input type="checkbox" id="accent-on"> use it</label></div>
-  <div><label for="text">Text colour</label><input type="color" id="text" value="#111111"> <label><input type="checkbox" id="text-on"> use it</label></div>
-  <div><label for="font">Font</label><select id="font"><option value="">Sans-serif</option><option value="serif">Serif</option><option value="mono">Monospace</option></select></div>
-  <div><label for="corners">Corners</label><select id="corners"><option value="">Slightly rounded</option><option value="square">Square</option><option value="round">Round</option></select></div>
+  <div><label for="theme">Theme</label><select id="theme"><option value="">As on your page</option><option value="light">Light</option><option value="dark">Dark</option><option value="transparent">Transparent</option></select></div>
+  <div><label for="accent">Accent colour</label><input type="color" id="accent" value="{{ band.accent_color|default:'#111111' }}"> <label><input type="checkbox" id="accent-on"> use it</label></div>
+  <div><label for="text">Text colour</label><input type="color" id="text" value="{{ band.text_color|default:'#111111' }}"> <label><input type="checkbox" id="text-on"> use it</label></div>
+  <div><label for="font">Font</label><select id="font"><option value="">As on your page</option><option value="sans">Sans-serif</option><option value="serif">Serif</option><option value="mono">Monospace</option></select></div>
+  <div><label for="corners">Corners</label><select id="corners"><option value="">As on your page</option><option value="slight">Slightly rounded</option><option value="square">Square</option><option value="round">Round</option></select></div>
   <div><label for="dates">Number of dates</label><input type="number" id="dates" min="1" placeholder="all"></div>
   <div><label><input type="checkbox" id="compact"> Compact rows</label></div>
   <div><label><input type="checkbox" id="near" checked> "Near me" button</label></div>

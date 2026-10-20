@@ -6,6 +6,7 @@ import xml.etree.ElementTree as ET
 from datetime import timedelta
 
 import pytest
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 from icalendar import Calendar
 
@@ -150,3 +151,58 @@ def test_iframe_only_code_has_no_script(band):
 def test_share_page_requires_admin(client, band):
     response = client.get(f"/admin/concerts/band/{band.pk}/share/")
     assert response.status_code == 302 and "/admin/login/" in response.url
+
+
+def test_band_style_on_page_and_widget(site, venue):
+    band = Band.objects.create(
+        name="Splenius", slug="splenius", theme="dark", accent_color="#c4161c", font="serif", corners="square"
+    )
+    for name in ("index.html", "widget/index.html"):
+        html = built(site, band, name)
+        assert 'data-theme="dark"' in html, name
+        assert "--accent: #c4161c; --on-accent: #fff" in html, name  # white text on a dark red button
+        assert "--font: Georgia" in html and "--radius: 0" in html, name
+
+
+def test_unstyled_band_keeps_the_default_look(site, band):
+    page = built(site, band, "index.html")
+    assert 'data-theme="light"' in page
+    assert "--accent" not in page.split("<head>")[0]  # no colour set on the page: the theme decides
+
+
+def test_invalid_colour_is_refused_and_never_reaches_the_css(site, band):
+    band.accent_color = "red; } body { background: url(evil.example)"
+    with pytest.raises(ValidationError):
+        band.full_clean()
+    Band.objects.filter(pk=band.pk).update(accent_color=band.accent_color)  # saved without validation
+    band.refresh_from_db()
+    assert "evil.example" not in built(site, band, "index.html")
+
+
+def test_style_page_saves_and_rebuilds(admin_client, site, band, django_capture_on_commit_callbacks):
+    url = f"/admin/concerts/band/{band.pk}/style/"
+    assert admin_client.get(url).status_code == 200
+    form = {"theme": "dark", "font": "serif", "corners": "round", "accent_color": "#c4161c", "use_accent_color": "on"}
+    # Text colour sent by its picker but not ticked: it keeps following the theme
+    with django_capture_on_commit_callbacks(execute=True):
+        response = admin_client.post(url, {**form, "text_color": "#00ff00", "background_color": "#ffffff"})
+    assert response.status_code == 302
+    band.refresh_from_db()
+    assert (band.theme, band.accent_color, band.text_color) == ("dark", "#c4161c", "")
+    assert "--accent: #c4161c" in (site / "damantra" / "index.html").read_text()
+
+
+def test_style_preview_shows_the_unsaved_style(admin_client, band):
+    response = admin_client.get(
+        f"/admin/concerts/band/{band.pk}/style/preview/",
+        {"theme": "dark", "font": "mono", "corners": "square", "accent_color": "#c4161c", "use_accent_color": "on"},
+    )
+    assert response["X-Frame-Options"] == "SAMEORIGIN"
+    assert "--accent: #c4161c" in response.content.decode()
+    band.refresh_from_db()
+    assert band.accent_color == ""  # nothing saved
+
+
+def test_style_pages_require_admin(client, band):
+    for url in (f"/admin/concerts/band/{band.pk}/style/", f"/admin/concerts/band/{band.pk}/style/preview/"):
+        assert client.get(url).status_code == 302  # to the login page

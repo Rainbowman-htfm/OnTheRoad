@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="{{ style.theme }}" style="{{ style.css }}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,10 +10,13 @@
 body { margin: 0; padding: .25rem .75rem; }
 .all { display: block; padding: .6rem 0 .3rem; color: var(--accent); text-decoration: none; }
 </style>
+{{ choices|json_script:"choices" }}
 <script>
-// Settings from the address, e.g. ?theme=dark&accent=c4161c&dates=3; anything unexpected is ignored
+// The band's style is the starting point; settings from the address override it,
+// e.g. ?theme=dark&accent=c4161c&dates=3. Anything unexpected is ignored.
 (function () {
   var params = new URLSearchParams(location.search), root = document.documentElement;
+  var choices = JSON.parse(document.getElementById("choices").textContent);
   function color(name) {
     var value = params.get(name);
     return value && /^[0-9a-f]{6}$/i.test(value) ? "#" + value : null;
@@ -22,12 +25,13 @@ body { margin: 0; padding: .25rem .75rem; }
     var n = parseInt(hex.slice(1), 16);
     return 0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255) > 150;
   }
-  var choices = {
-    theme: ["light", "dark", "transparent"],
-    font: {sans: "system-ui, sans-serif", serif: "Georgia, 'Times New Roman', serif", mono: "ui-monospace, Menlo, Consolas, monospace"},
-    corners: {square: "0", round: "14px"}
-  };
-  if (choices.theme.indexOf(params.get("theme")) >= 0) root.dataset.theme = params.get("theme");
+  if (["light", "dark", "transparent"].indexOf(params.get("theme")) >= 0) {
+    root.dataset.theme = params.get("theme");
+    // The band's background and text colours were chosen for its own theme: a theme in the address replaces
+    // them. Its accent colour stays, unless the address gives one too.
+    root.style.removeProperty("--bg");
+    root.style.removeProperty("--fg");
+  }
   var accent = color("accent"), text = color("text");
   if (accent) {
     root.style.setProperty("--accent", accent);

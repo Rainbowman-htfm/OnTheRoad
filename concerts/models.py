@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
 
@@ -43,13 +44,38 @@ class Account(AbstractUser):
         return self.email
 
 
+# "#c4161c": checked before saving, since the colour ends up in the public pages' CSS
+hex_color = RegexValidator(r"^#[0-9a-fA-F]{6}$", "Enter a colour like #c4161c.")
+
+
 class Band(models.Model):
+    class Theme(models.TextChoices):
+        LIGHT = "light"
+        DARK = "dark"
+
+    class Font(models.TextChoices):
+        SANS = "sans", "sans-serif"
+        SERIF = "serif"
+        MONO = "mono", "monospace"
+
+    class Corners(models.TextChoices):
+        SLIGHT = "slight", "slightly rounded"
+        SQUARE = "square"
+        ROUND = "round"
+
     name = models.CharField(max_length=200)
     slug = models.SlugField(max_length=200, unique=True, help_text="Public page address: /<slug>/")
     # MusicBrainz identifiers (MBID) are UUIDs; null rather than empty so uniqueness ignores bands without one
     musicbrainz_id = models.UUIDField("MusicBrainz ID", null=True, blank=True, unique=True)
     # Official site (schema.org "url"); other profiles go in BandLink (schema.org "sameAs")
     website = models.URLField(blank=True)
+    # Page style, also the widget's starting point; an empty colour follows the theme
+    theme = models.CharField(max_length=10, choices=Theme.choices, default=Theme.LIGHT)
+    accent_color = models.CharField(max_length=7, blank=True, validators=[hex_color], help_text="Buttons and links.")
+    text_color = models.CharField(max_length=7, blank=True, validators=[hex_color])
+    background_color = models.CharField(max_length=7, blank=True, validators=[hex_color], help_text="Page only.")
+    font = models.CharField(max_length=10, choices=Font.choices, default=Font.SANS)
+    corners = models.CharField(max_length=10, choices=Corners.choices, default=Corners.SLIGHT)
     members = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Membership", related_name="bands", blank=True)
 
     # Reverse relations, created by Django from the other side; declared for editors and type checkers

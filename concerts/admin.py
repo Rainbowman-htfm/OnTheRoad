@@ -1,6 +1,8 @@
+from typing import Any
 from urllib.parse import urlencode
 from uuid import UUID
 
+from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
 from django.core.exceptions import PermissionDenied
@@ -8,6 +10,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.template.response import TemplateResponse
 from django.urls import URLPattern, path, reverse
+from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from . import musicbrainz, public
 from .models import Account, Band, BandLink, Concert, Membership, Venue, VenueLink
@@ -50,17 +53,89 @@ class ConcertInline(admin.TabularInline):
     autocomplete_fields = ["venue"]
 
 
+class StyleForm(forms.ModelForm):
+    """A colour picker always sends a colour, so each colour has a "use it" box; unticked, it follows the theme."""
+
+    COLORS = {"accent_color": "#111111", "text_color": "#111111", "background_color": "#ffffff"}
+
+    use_accent_color = forms.BooleanField(required=False)
+    use_text_color = forms.BooleanField(required=False)
+    use_background_color = forms.BooleanField(required=False)
+
+    class Meta:
+        model = Band
+        fields = ["theme", "font", "corners", "accent_color", "text_color", "background_color"]
+        widgets = {
+            name: forms.TextInput(attrs={"type": "color"})
+            for name in ["accent_color", "text_color", "background_color"]
+        }
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        for name, default in self.COLORS.items():
+            self.initial["use_" + name] = bool(self.initial.get(name))
+            self.initial[name] = self.initial.get(name) or default
+
+    def clean(self) -> dict[str, Any]:
+        for name in self.COLORS:
+            if not self.cleaned_data.get("use_" + name):
+                self.cleaned_data[name] = ""
+        return self.cleaned_data
+
+
 @admin.register(Band)
 class BandAdmin(admin.ModelAdmin):
     list_display = ["name", "slug"]
     search_fields = ["name"]
     prepopulated_fields = {"slug": ["name"]}
     inlines = [ConcertInline, BandLinkInline, MembershipInline]
+    fields = ["name", "slug", "musicbrainz_id", "website"]  # the style has its own page
 
     def get_urls(self) -> list[URLPattern]:
         return [
             path("<int:band_id>/share/", self.admin_site.admin_view(self.share), name="concerts_band_share"),
+            path("<int:band_id>/style/", self.admin_site.admin_view(self.style), name="concerts_band_style"),
+            path(
+                "<int:band_id>/style/preview/",
+                # Shown in a frame of the style page, so allowed in frames from this site
+                self.admin_site.admin_view(xframe_options_sameorigin(self.style_preview)),
+                name="concerts_band_style_preview",
+            ),
         ] + super().get_urls()
+
+    def style(self, request: HttpRequest, band_id: int) -> HttpResponse:
+        """Page style with a live preview; saving rebuilds the public page like any band change."""
+        band = get_object_or_404(Band, pk=band_id)
+        if not self.has_change_permission(request, band):
+            raise PermissionDenied
+        form = StyleForm(request.POST or None, instance=band)
+        if form.is_valid():
+            form.save()
+            messages.success(request, "Page style saved.")
+            return redirect(reverse("admin:concerts_band_style", args=[band.pk]))
+        return TemplateResponse(
+            request,
+            "admin/concerts/band/style.html",
+            {
+                **self.admin_site.each_context(request),
+                "opts": self.model._meta,
+                "original": band,
+                "title": f"Page style of {band.name}",
+                "band": band,
+                "form": form,
+                "colors": [(form[name], form["use_" + name]) for name in StyleForm.COLORS],
+            },
+        )
+
+    def style_preview(self, request: HttpRequest, band_id: int) -> HttpResponse:
+        """The band page with the style from the address, without saving it."""
+        band = get_object_or_404(Band, pk=band_id)
+        if not self.has_change_permission(request, band):
+            raise PermissionDenied
+        form = StyleForm(request.GET, instance=band)
+        form.is_valid()  # copies the valid values onto this unsaved band; invalid ones keep the saved style
+        concerts = list(public.upcoming_concerts(band))
+        return HttpResponse(public.band_page(band, concerts, [link.url for link in band.links.all()]))
 
     def share(self, request: HttpRequest, band_id: int) -> HttpResponse:
         """Links, widget settings with a live preview, and the code to paste on the band's website."""

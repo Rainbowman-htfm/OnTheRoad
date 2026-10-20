@@ -2,6 +2,7 @@
 page, widget, iCal and RSS feeds, and the MusicEvent data as JSON."""
 
 import json
+import re
 import shutil
 from datetime import datetime, time, timedelta
 from typing import Any
@@ -29,6 +30,39 @@ ICAL_STATUS: dict[str, str] = {
     Concert.Status.CANCELLED: "CANCELLED",
     Concert.Status.POSTPONED: "TENTATIVE",
 }
+
+
+# Style choices shared by the page and the widget (the widget's address settings use the same names)
+FONTS = {
+    "sans": "system-ui, sans-serif",
+    "serif": "Georgia, 'Times New Roman', serif",
+    "mono": "ui-monospace, Menlo, Consolas, monospace",
+}
+RADIUS = {"slight": "6px", "square": "0", "round": "14px"}
+HEX_COLOR = re.compile(r"^#[0-9a-fA-F]{6}$")
+
+
+def is_light(color: str) -> bool:
+    """Whether dark text reads better than white text on this colour."""
+    red, green, blue = (int(color[i : i + 2], 16) for i in (1, 3, 5))
+    return 0.299 * red + 0.587 * green + 0.114 * blue > 150
+
+
+def band_style(band: Band) -> dict[str, str]:
+    """The band's style as an HTML theme and CSS variables. Only known values reach the CSS: colours are
+    checked again here, whatever saved them."""
+    variables = {"--font": FONTS.get(band.font, FONTS["sans"]), "--radius": RADIUS.get(band.corners, RADIUS["slight"])}
+    if HEX_COLOR.match(band.accent_color):
+        variables["--accent"] = band.accent_color
+        variables["--on-accent"] = "#111" if is_light(band.accent_color) else "#fff"
+    if HEX_COLOR.match(band.text_color):
+        variables["--fg"] = band.text_color
+    if HEX_COLOR.match(band.background_color):
+        variables["--bg"] = band.background_color
+    return {
+        "theme": "dark" if band.theme == Band.Theme.DARK else "light",
+        "css": "; ".join(f"{name}: {value}" for name, value in variables.items()),
+    }
 
 
 def site_url() -> str:
@@ -123,6 +157,7 @@ def band_page(band: Band, concerts: list[Concert], band_links: list[str]) -> str
             "events": [json_for_script(music_event(concert, band_links)) for concert in concerts],
             "links": [(url, link_label(url)) for url in links],
             "calendar_url": "webcal://" + page_url(band).split("://", 1)[1] + "concerts.ics",
+            "style": band_style(band),
         },
     )
 
@@ -146,7 +181,16 @@ def embed_code(band: Band, template: str = "concerts/embed_code.html") -> str:
 
 
 def widget_page(band: Band, concerts: list[Concert]) -> str:
-    return render_to_string("concerts/widget.html", {"band": band, "concerts": concerts, "page_url": page_url(band)})
+    return render_to_string(
+        "concerts/widget.html",
+        {
+            "band": band,
+            "concerts": concerts,
+            "page_url": page_url(band),
+            "style": band_style(band),
+            "choices": {"font": FONTS, "corners": RADIUS},
+        },
+    )
 
 
 def describe(concert: Concert) -> str:
