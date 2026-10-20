@@ -1,0 +1,37 @@
+{% extends "admin/base_site.html" %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">Home</a> › <a href="{% url 'admin:concerts_venue_changelist' %}">Venues</a> › Search MusicBrainz
+</div>
+{% endblock %}
+{% block content %}
+<form method="get">
+  <p>
+    <label>Name <input name="name" value="{{ name }}" required autofocus></label>
+    <label>City <input name="city" value="{{ city }}"></label>
+    <button type="submit">Search</button>
+  </p>
+</form>
+{% if name %}
+  {% if results %}
+  <table>
+    <thead><tr><th>Name</th><th>Type</th><th>Address</th><th>City</th><th>Coordinates</th><th></th></tr></thead>
+    <tbody>
+    {% for result in results %}
+    <tr>
+      <td><a href="https://musicbrainz.org/place/{{ result.musicbrainz_id }}" target="_blank" rel="noopener">{{ result.name }}</a></td>
+      <td>{{ result.type }}</td>
+      <td>{{ result.address }}</td>
+      <td>{{ result.postal_code }} {{ result.city }}</td>
+      <td>{% if result.latitude %}yes{% else %}—{% endif %}</td>
+      <td>{% if result.venue %}<a href="{% url 'admin:concerts_venue_change' result.venue.pk %}">already added</a>{% else %}<a class="button" href="{% url 'admin:concerts_venue_musicbrainz_use' result.musicbrainz_id %}">Use this</a>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% elif not messages %}
+  <p>No place found on MusicBrainz. Try a shorter name, or leave the city empty.</p>
+  {% endif %}
+{% endif %}
+<p class="help">Data from <a href="https://musicbrainz.org" target="_blank" rel="noopener">MusicBrainz</a>, under CC0.</p>
+{% endblock %}
