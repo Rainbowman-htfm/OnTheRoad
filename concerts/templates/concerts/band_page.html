@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ band.name }} – upcoming concerts</title>
+<meta name="description" content="Upcoming concerts of {{ band.name }}">
+<style>
+body { font-family: system-ui, sans-serif; max-width: 54rem; margin: 0 auto; padding: 1rem; line-height: 1.4; color: #111; background: #fff; }
+h1 { margin: 0; }
+.sub, .details, .muted, footer { color: #666; }
+button { font: inherit; background: none; border: 1px solid #111; border-radius: 6px; padding: .25rem .7rem; cursor: pointer; }
+ul { list-style: none; padding: 0; }
+.concert { display: flex; gap: .8rem; align-items: center; padding: .7rem 0; border-bottom: 1px solid #eee; }
+.tile { width: 3rem; flex: none; text-align: center; border: 1px solid #ddd; border-radius: 8px; padding: .25rem 0; }
+.tile .d { display: block; font-size: 1.3rem; font-weight: 700; line-height: 1; }
+.tile .m { display: block; font-size: .7rem; text-transform: uppercase; color: #666; }
+.info { flex: 1; }
+.venue { display: block; }
+.details span:not(:first-child):not(:empty)::before { content: " · "; }
+.action { flex: none; }
+.tickets { display: inline-block; background: #111; color: #fff; border-radius: 6px; padding: .3rem .8rem; text-decoration: none; }
+.cancelled .venue, .cancelled .details { text-decoration: line-through; color: #888; }
+.status-cancelled { color: #b00; font-weight: 600; }
+footer a { color: inherit; }
+/* Wide screens: venue, city, time, support act and distance line up in columns */
+@media (min-width: 720px) {
+  .info { display: grid; grid-template-columns: 1fr 9rem 6rem 11rem 4rem; align-items: center; gap: .8rem; }
+  .venue { display: inline; }
+  .details { display: contents; }
+  .details span::before { content: none !important; }
+  .action { width: 6rem; text-align: right; }
+}
+</style>
+{% for concert in concerts %}
+<script type="application/ld+json">{{ concert.json_ld }}</script>
+{% endfor %}
+</head>
+<body>
+<h1>{{ band.name }}</h1>
+<p class="sub">Upcoming concerts</p>
+{% if concerts %}
+<p><button id="near" type="button" hidden>📍 Near me</button> <span id="near-message" class="muted"></span></p>
+<ul id="concerts">
+{% for concert in concerts %}
+<li class="concert{% if concert.status == 'cancelled' %} cancelled{% endif %}"{% if concert.venue.latitude is not None and concert.venue.longitude is not None %} data-lat="{{ concert.venue.latitude|stringformat:'f' }}" data-lon="{{ concert.venue.longitude|stringformat:'f' }}"{% endif %}>
+  <time class="tile" datetime="{{ concert.starts_at|date:'c' }}"><span class="d">{{ concert.starts_at|date:"j" }}</span><span class="m">{{ concert.starts_at|date:"M" }}</span></time>
+  <div class="info">
+    <strong class="venue">{{ concert.venue.name }}</strong>
+    <span class="details"><span>{{ concert.venue.city }}</span><span>{{ concert.starts_at|date:"D H:i" }}</span><span>{% if concert.support_acts %}with {{ concert.support_acts }}{% endif %}</span><span class="km"></span></span>
+  </div>
+  <div class="action">
+    {% if concert.status == "cancelled" %}<span class="status-cancelled">Cancelled</span>
+    {% elif concert.status == "postponed" %}<span class="muted">Postponed</span>
+    {% elif concert.status == "sold_out" %}<span class="muted">Sold out</span>
+    {% elif concert.ticket_url %}<a class="tickets" href="{{ concert.ticket_url }}" rel="noopener">Tickets</a>{% endif %}
+  </div>
+</li>
+{% endfor %}
+</ul>
+{% else %}
+<p>No upcoming concerts.</p>
+{% endif %}
+{% if links %}
+<footer><p>{% for url, label in links %}<a href="{{ url }}" rel="me noopener">{{ label }}</a>{% if not forloop.last %} · {% endif %}{% endfor %}</p></footer>
+{% endif %}
+<script>
+// "Near me": the location stays in the browser, nothing is sent anywhere
+(function () {
+  var button = document.getElementById("near");
+  if (!button || !navigator.geolocation) return;
+  button.hidden = false;
+  var message = document.getElementById("near-message");
+  function km(lat1, lon1, lat2, lon2) {
+    var rad = Math.PI / 180, a = Math.sin((lat2 - lat1) * rad / 2) ** 2
+      + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin((lon2 - lon1) * rad / 2) ** 2;
+    return 12742 * Math.asin(Math.sqrt(a));
+  }
+  button.onclick = function () {
+    message.textContent = "Locating…";
+    navigator.geolocation.getCurrentPosition(function (position) {
+      var list = document.getElementById("concerts"), rows = Array.from(list.children);
+      rows.forEach(function (row) {
+        row.distance = row.dataset.lat ? km(position.coords.latitude, position.coords.longitude, +row.dataset.lat, +row.dataset.lon) : Infinity;
+        row.querySelector(".km").textContent = row.distance < Infinity ? Math.round(row.distance) + " km" : "";
+      });
+      rows.sort(function (a, b) { return a.distance - b.distance; }).forEach(function (row) { list.appendChild(row); });
+      message.textContent = "Nearest first";
+    }, function () { message.textContent = "Location unavailable"; });
+  };
+})();
+</script>
+</body>
+</html>
