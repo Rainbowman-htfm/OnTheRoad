@@ -1,0 +1,27 @@
+<script>
+// "Near me": the location stays in the browser, nothing is sent anywhere
+(function () {
+  var button = document.getElementById("near");
+  if (!button || !navigator.geolocation || document.documentElement.dataset.near === "off") return;
+  button.hidden = false;
+  var message = document.getElementById("near-message");
+  function km(lat1, lon1, lat2, lon2) {
+    var rad = Math.PI / 180, a = Math.sin((lat2 - lat1) * rad / 2) ** 2
+      + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin((lon2 - lon1) * rad / 2) ** 2;
+    return 12742 * Math.asin(Math.sqrt(a));
+  }
+  button.onclick = function () {
+    message.textContent = "Locating…";
+    navigator.geolocation.getCurrentPosition(function (position) {
+      var list = document.getElementById("concerts"), rows = Array.from(list.children);
+      rows.forEach(function (row) {
+        row.distance = row.dataset.lat ? km(position.coords.latitude, position.coords.longitude, +row.dataset.lat, +row.dataset.lon) : Infinity;
+        row.querySelector(".km").textContent = row.distance < Infinity ? Math.round(row.distance) + " km" : "";
+      });
+      rows.sort(function (a, b) { return a.distance - b.distance; }).forEach(function (row) { list.appendChild(row); });
+      if (window.limitRows) window.limitRows();  // the widget shows only its first dates
+      message.textContent = "Nearest first";
+    }, function () { message.textContent = "Location unavailable"; });
+  };
+})();
+</script>

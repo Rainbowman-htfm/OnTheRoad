@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ band.name }} – upcoming concerts</title>
+<meta name="robots" content="noindex">
+{% include "concerts/_style.html" %}
+<style>
+body { margin: 0; padding: .25rem .75rem; }
+.all { display: block; padding: .6rem 0 .3rem; color: var(--accent); text-decoration: none; }
+</style>
+<script>
+// Settings from the address, e.g. ?theme=dark&accent=c4161c&dates=3; anything unexpected is ignored
+(function () {
+  var params = new URLSearchParams(location.search), root = document.documentElement;
+  function color(name) {
+    var value = params.get(name);
+    return value && /^[0-9a-f]{6}$/i.test(value) ? "#" + value : null;
+  }
+  function isLight(hex) {
+    var n = parseInt(hex.slice(1), 16);
+    return 0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255) > 150;
+  }
+  var choices = {
+    theme: ["light", "dark", "transparent"],
+    font: {sans: "system-ui, sans-serif", serif: "Georgia, 'Times New Roman', serif", mono: "ui-monospace, Menlo, Consolas, monospace"},
+    corners: {square: "0", round: "14px"}
+  };
+  if (choices.theme.indexOf(params.get("theme")) >= 0) root.dataset.theme = params.get("theme");
+  var accent = color("accent"), text = color("text");
+  if (accent) {
+    root.style.setProperty("--accent", accent);
+    root.style.setProperty("--on-accent", isLight(accent) ? "#111" : "#fff");
+  }
+  if (text) root.style.setProperty("--fg", text);
+  if (choices.font.hasOwnProperty(params.get("font"))) root.style.setProperty("--font", choices.font[params.get("font")]);
+  if (choices.corners.hasOwnProperty(params.get("corners"))) root.style.setProperty("--radius", choices.corners[params.get("corners")]);
+  if (params.get("compact") === "on") root.classList.add("compact");
+  if (params.get("near") === "off") root.dataset.near = "off";
+  var max = parseInt(params.get("dates"), 10);
+  window.limitRows = function () {
+    if (!(max > 0)) return;
+    Array.from(document.querySelectorAll("#concerts > li")).forEach(function (row, i) { row.hidden = i >= max; });
+  };
+})();
+</script>
+</head>
+<body>
+{% if concerts %}
+<p><button class="near" id="near" type="button" hidden>📍 Near me</button> <span id="near-message" class="muted"></span></p>
+{% include "concerts/_concert_list.html" with new_tab=True %}
+{% else %}
+<p class="muted">No upcoming concerts.</p>
+{% endif %}
+<a class="all" href="{{ page_url }}" target="_blank" rel="noopener">All dates →</a>
+{% include "concerts/_near_me.html" %}
+<script>
+// Show only the first dates, then tell the band's page how tall the widget is
+(function () {
+  window.limitRows();
+  function sendHeight() {
+    // The body's own height, so the widget can also shrink (the page's height never goes below the iframe's)
+    parent.postMessage({type: "otr-height", height: Math.ceil(document.body.getBoundingClientRect().height)}, "*");
+  }
+  new ResizeObserver(sendHeight).observe(document.body);
+})();
+</script>
+</body>
+</html>

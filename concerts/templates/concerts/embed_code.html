@@ -1,0 +1,22 @@
+<iframe id="{{ frame_id }}" src="{{ widget_url }}__QUERY__" title="{{ band.name }} concerts"
+  style="width:100%;border:0" loading="lazy" referrerpolicy="no-referrer"__ALLOW__></iframe>
+<script>
+(function () {
+  var origin = "{{ origin }}", frame = document.getElementById("{{ frame_id }}");
+  // Adjust the widget's height when it says how tall it is
+  addEventListener("message", function (event) {
+    if (event.origin === origin && event.source === frame.contentWindow && event.data && event.data.type === "otr-height") {
+      frame.style.height = event.data.height + "px";
+    }
+  });
+  // Add the concerts' MusicEvent data to this page, for search engines
+  fetch("{{ events_url }}", {referrerPolicy: "no-referrer"})
+    .then(function (response) { return response.json(); })
+    .then(function (events) {
+      var block = document.createElement("script");
+      block.type = "application/ld+json";
+      block.textContent = JSON.stringify(events);
+      document.head.appendChild(block);
+    });
+})();
+</script>

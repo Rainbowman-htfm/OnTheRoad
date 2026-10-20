@@ -1,0 +1,115 @@
+{% extends "admin/base_site.html" %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">Home</a> › <a href="{% url 'admin:concerts_band_changelist' %}">Bands</a> › <a href="{% url 'admin:concerts_band_change' band.pk %}">{{ band.name }}</a> › Share
+</div>
+{% endblock %}
+{% block extrastyle %}{{ block.super }}
+<style>
+.share-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: .6rem 1.2rem; max-width: 60rem; }
+.share-grid label { display: block; font-weight: 600; }
+.share textarea { width: 100%; max-width: 60rem; font-family: ui-monospace, monospace; font-size: 12px; }
+.share iframe { width: 100%; max-width: 60rem; border: 1px dashed #aaa; }
+.share h2 { margin-top: 1.6rem; }
+</style>
+{% endblock %}
+{% block content %}
+<div class="share">
+<h2>Links</h2>
+<ul>
+  <li>Public page: <a href="{{ page_url }}" target="_blank" rel="noopener">{{ page_url }}</a></li>
+  <li>Calendar (iCal): <a href="{{ page_url }}concerts.ics">{{ page_url }}concerts.ics</a></li>
+  <li>RSS: <a href="{{ page_url }}concerts.xml">{{ page_url }}concerts.xml</a></li>
+</ul>
+
+<h2>Widget for your website</h2>
+<form id="settings" class="share-grid">
+  <div><label for="theme">Theme</label><select id="theme"><option value="">Light</option><option value="dark">Dark</option><option value="transparent">Transparent</option></select></div>
+  <div><label for="accent">Accent colour</label><input type="color" id="accent" value="#111111"> <label><input type="checkbox" id="accent-on"> use it</label></div>
+  <div><label for="text">Text colour</label><input type="color" id="text" value="#111111"> <label><input type="checkbox" id="text-on"> use it</label></div>
+  <div><label for="font">Font</label><select id="font"><option value="">Sans-serif</option><option value="serif">Serif</option><option value="mono">Monospace</option></select></div>
+  <div><label for="corners">Corners</label><select id="corners"><option value="">Slightly rounded</option><option value="square">Square</option><option value="round">Round</option></select></div>
+  <div><label for="dates">Number of dates</label><input type="number" id="dates" min="1" placeholder="all"></div>
+  <div><label><input type="checkbox" id="compact"> Compact rows</label></div>
+  <div><label><input type="checkbox" id="near" checked> "Near me" button</label></div>
+</form>
+
+<h3>Preview</h3>
+<iframe id="preview" title="Widget preview"></iframe>
+
+<h3>Code to paste on your website</h3>
+<p>Paste it where the dates should appear, not in a template shared by every page. It shows the widget and adds your concerts' MusicEvent data to that page for search engines. Nothing else is loaded: the code is yours, and it only reads your dates from {{ site_url }}.</p>
+<textarea id="code" rows="16" readonly></textarea>
+<p><button type="button" class="button" data-copy="code">Copy</button></p>
+
+<h3>If your website does not allow scripts</h3>
+<p>Paste these two blocks instead, where the dates should appear.</p>
+<p><strong>1. The widget.</strong> Its dates still update by themselves, but its height is fixed: it is set to fit the preview above, so adjust the settings first. With more dates than fit, the widget scrolls inside its frame.</p>
+<textarea id="iframe-code" rows="3" readonly></textarea>
+<p><button type="button" class="button" data-copy="iframe-code">Copy</button></p>
+<p><strong>2. Your dates for search engines.</strong> This block does not update itself: paste it again after changing your dates.</p>
+{{ embed_code|json_script:"embed-code" }}
+{{ embed_iframe|json_script:"embed-iframe" }}
+<textarea id="block" rows="6" readonly>&lt;script type="application/ld+json"&gt;{{ events_json|force_escape }}&lt;/script&gt;</textarea>
+<p><button type="button" class="button" data-copy="block">Copy</button></p>
+</div>
+
+<script>
+(function () {
+  var site = "{{ site_url|escapejs }}", slug = "{{ band.slug|escapejs }}";
+  var embedCode = JSON.parse(document.getElementById("embed-code").textContent);
+  var embedIframe = JSON.parse(document.getElementById("embed-iframe").textContent);
+  var height = 400;  // replaced by the preview's measured height
+  var form = document.getElementById("settings"), preview = document.getElementById("preview"), code = document.getElementById("code");
+  function value(id) { return document.getElementById(id).value; }
+  function checked(id) { return document.getElementById(id).checked; }
+  function attr(text) { return text.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
+
+  function query() {
+    var params = new URLSearchParams();
+    if (value("theme")) params.set("theme", value("theme"));
+    if (checked("accent-on")) params.set("accent", value("accent").slice(1));
+    if (checked("text-on")) params.set("text", value("text").slice(1));
+    if (value("font")) params.set("font", value("font"));
+    if (value("corners")) params.set("corners", value("corners"));
+    if (value("dates")) params.set("dates", value("dates"));
+    if (checked("compact")) params.set("compact", "on");
+    if (!checked("near")) params.set("near", "off");
+    var text = params.toString();
+    return text ? "?" + text : "";
+  }
+
+  // Settings changed: reload the preview, then rewrite the codes
+  function update() {
+    preview.src = site + "/" + slug + "/widget/" + query();
+    writeCodes();
+  }
+
+  function writeCodes() {
+    var allow = checked("near") ? ' allow="geolocation"' : "";
+    code.value = embedCode.replace("__QUERY__", attr(query())).replace("__ALLOW__", allow);
+    document.getElementById("iframe-code").value = embedIframe
+      .replace("__QUERY__", attr(query()))
+      .replace("__ALLOW__", allow)
+      .replace("__HEIGHT__", height);
+  }
+
+  addEventListener("message", function (event) {
+    if (event.source === preview.contentWindow && event.data && event.data.type === "otr-height") {
+      preview.style.height = event.data.height + "px";
+      height = event.data.height + 8;  // a little room, e.g. for a wrapped line
+      writeCodes();  // not update(): reloading the preview would send its height again, endlessly
+    }
+  });
+  document.querySelectorAll("[data-copy]").forEach(function (button) {
+    button.onclick = function () {
+      var area = document.getElementById(button.dataset.copy);
+      area.select();
+      navigator.clipboard.writeText(area.value).then(function () { button.textContent = "Copied"; });
+    };
+  });
+  form.addEventListener("input", update);
+  update();
+})();
+</script>
+{% endblock %}

@@ -1,0 +1,17 @@
+<ul class="concerts" id="concerts">
+{% for concert in concerts %}
+<li class="concert{% if concert.status == 'cancelled' %} cancelled{% endif %}"{% if concert.venue.latitude is not None and concert.venue.longitude is not None %} data-lat="{{ concert.venue.latitude|stringformat:'f' }}" data-lon="{{ concert.venue.longitude|stringformat:'f' }}"{% endif %}>
+  <time class="tile" datetime="{{ concert.starts_at|date:'c' }}"><span class="d">{{ concert.starts_at|date:"j" }}</span><span class="m">{{ concert.starts_at|date:"M" }}</span></time>
+  <div class="info">
+    <strong class="venue">{{ concert.venue.name }}</strong>
+    <span class="details"><span>{{ concert.venue.city }}</span><span>{{ concert.starts_at|date:"D H:i" }}</span><span>{% if concert.support_acts %}with {{ concert.support_acts }}{% endif %}</span><span class="km"></span></span>
+  </div>
+  <div class="action">
+    {% if concert.status == "cancelled" %}<span class="status-cancelled">Cancelled</span>
+    {% elif concert.status == "postponed" %}<span class="muted">Postponed</span>
+    {% elif concert.status == "sold_out" %}<span class="muted">Sold out</span>
+    {% elif concert.ticket_url %}<a class="tickets" href="{{ concert.ticket_url }}"{% if new_tab %} target="_blank"{% endif %} rel="noopener">Tickets</a>{% endif %}
+  </div>
+</li>
+{% endfor %}
+</ul>

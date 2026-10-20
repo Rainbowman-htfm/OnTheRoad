@@ -5,11 +5,11 @@ from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
 from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponse
-from django.shortcuts import redirect
+from django.shortcuts import get_object_or_404, redirect
 from django.template.response import TemplateResponse
 from django.urls import URLPattern, path, reverse
 
-from . import musicbrainz
+from . import musicbrainz, public
 from .models import Account, Band, BandLink, Concert, Membership, Venue, VenueLink
 
 
@@ -46,7 +46,7 @@ class VenueLinkInline(admin.TabularInline):
 class ConcertInline(admin.TabularInline):
     model = Concert
     extra = 1
-    fields = ["starts_at", "venue", "status", "ticket_url", "support_acts"]
+    fields = ["starts_at", "ends_at", "venue", "status", "ticket_url", "support_acts"]
     autocomplete_fields = ["venue"]
 
 
@@ -56,6 +56,35 @@ class BandAdmin(admin.ModelAdmin):
     search_fields = ["name"]
     prepopulated_fields = {"slug": ["name"]}
     inlines = [ConcertInline, BandLinkInline, MembershipInline]
+
+    def get_urls(self) -> list[URLPattern]:
+        return [
+            path("<int:band_id>/share/", self.admin_site.admin_view(self.share), name="concerts_band_share"),
+        ] + super().get_urls()
+
+    def share(self, request: HttpRequest, band_id: int) -> HttpResponse:
+        """Links, widget settings with a live preview, and the code to paste on the band's website."""
+        band = get_object_or_404(Band, pk=band_id)
+        if not self.has_view_permission(request, band):
+            raise PermissionDenied
+        concerts = list(public.upcoming_concerts(band))
+        band_links = [link.url for link in band.links.all()]
+        return TemplateResponse(
+            request,
+            "admin/concerts/band/share.html",
+            {
+                **self.admin_site.each_context(request),
+                "opts": self.model._meta,
+                "original": band,
+                "title": f"Share {band.name}",
+                "band": band,
+                "site_url": public.site_url(),
+                "page_url": public.page_url(band),
+                "embed_code": public.embed_code(band),
+                "embed_iframe": public.embed_code(band, "concerts/embed_iframe.html"),
+                "events_json": public.json_for_script([public.music_event(c, band_links) for c in concerts]),
+            },
+        )
 
 
 @admin.register(Venue)

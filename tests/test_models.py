@@ -60,6 +60,12 @@ def test_sqlite_foreign_keys_enforced(concert):
         connection.check_constraints()
 
 
+def test_end_must_be_after_start(concert):
+    concert.ends_at = concert.starts_at
+    with pytest.raises(IntegrityError), transaction.atomic():
+        concert.save()
+
+
 def test_venue_protected_and_band_cascades(concert):
     with pytest.raises(ProtectedError):
         concert.venue.delete()

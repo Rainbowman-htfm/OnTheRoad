@@ -137,6 +137,8 @@ class Concert(models.Model):
     venue = models.ForeignKey(Venue, on_delete=models.PROTECT, related_name="concerts")
     # Stored in UTC, displayed in the TIME_ZONE setting (USE_TZ = True)
     starts_at = models.DateTimeField()
+    # Optional: often unknown when a concert is announced
+    ends_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PLANNED)
     ticket_url = models.URLField(blank=True)
     support_acts = models.CharField(max_length=300, blank=True)
@@ -144,6 +146,14 @@ class Concert(models.Model):
 
     class Meta:
         ordering = ["starts_at"]
+        constraints = [
+            # Checked by the database itself, whatever saves the concert
+            models.CheckConstraint(
+                condition=models.Q(ends_at__isnull=True) | models.Q(ends_at__gt=models.F("starts_at")),
+                name="concert_ends_after_start",
+                violation_error_message="The end must be after the start.",
+            )
+        ]
 
     def __str__(self) -> str:
         return f"{self.band} — {self.venue} — {timezone.localtime(self.starts_at):%Y-%m-%d}"

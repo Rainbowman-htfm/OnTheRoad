@@ -1,4 +1,5 @@
-"""Static public pages: one HTML file per band, written to settings.PUBLIC_DIR."""
+"""Static public files for each band, written to settings.PUBLIC_DIR/<slug>/:
+page, widget, iCal and RSS feeds, and the MusicEvent data as JSON."""
 
 import json
 import shutil
@@ -9,8 +10,10 @@ from urllib.parse import urlparse
 from django.conf import settings
 from django.db.models import QuerySet
 from django.template.loader import render_to_string
-from django.utils import timezone
-from django.utils.safestring import mark_safe
+from django.utils import dateformat, timezone
+from django.utils.feedgenerator import Rss201rev2Feed
+from django.utils.safestring import SafeString, mark_safe
+from icalendar import Calendar, Event
 
 from .models import Band, Concert
 
@@ -20,6 +23,25 @@ EVENT_STATUS: dict[str, str] = {
     Concert.Status.CANCELLED: "EventCancelled",
     Concert.Status.POSTPONED: "EventPostponed",
 }
+ICAL_STATUS: dict[str, str] = {
+    Concert.Status.PLANNED: "CONFIRMED",
+    Concert.Status.SOLD_OUT: "CONFIRMED",
+    Concert.Status.CANCELLED: "CANCELLED",
+    Concert.Status.POSTPONED: "TENTATIVE",
+}
+
+
+def site_url() -> str:
+    return settings.SITE_URL.rstrip("/")
+
+
+def page_url(band: Band) -> str:
+    return f"{site_url()}/{band.slug}/"
+
+
+def concert_uid(concert: Concert) -> str:
+    """Stable identifier, so calendars and feed readers update a concert instead of duplicating it."""
+    return f"concert-{concert.pk}@{urlparse(settings.SITE_URL).hostname}"
 
 
 def upcoming_concerts(band: Band) -> QuerySet[Concert]:
@@ -61,6 +83,7 @@ def music_event(concert: Concert, same_as: list[str]) -> dict[str, Any]:
         "@type": "MusicEvent",
         "name": f"{band.name} at {venue.name}",
         "startDate": timezone.localtime(concert.starts_at).isoformat(),
+        **({"endDate": timezone.localtime(concert.ends_at).isoformat()} if concert.ends_at else {}),
         "eventStatus": "https://schema.org/" + EVENT_STATUS[concert.status],
         "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
         "location": location,
@@ -76,31 +99,119 @@ def music_event(concert: Concert, same_as: list[str]) -> dict[str, Any]:
     return event
 
 
-def band_page(band: Band) -> str:
-    concerts = list(upcoming_concerts(band))
-    # Loaded once for the whole page, not once per concert
-    band_links = [link.url for link in band.links.all()]
+def json_for_script(data: Any) -> SafeString:
     # "<" escaped so a name containing "</script>" cannot end the block early
-    events = [
-        mark_safe(json.dumps(music_event(concert, band_links), ensure_ascii=False).replace("<", "\\u003c"))
-        for concert in concerts
-    ]
+    return mark_safe(json.dumps(data, ensure_ascii=False).replace("<", "\\u003c"))
+
+
+def band_page(band: Band, concerts: list[Concert], band_links: list[str]) -> str:
     links = ([band.website] if band.website else []) + band_links
     return render_to_string(
         "concerts/band_page.html",
         {
             "band": band,
             "concerts": concerts,
-            "events": events,
+            "events": [json_for_script(music_event(concert, band_links)) for concert in concerts],
             "links": [(url, link_label(url)) for url in links],
+            "calendar_url": "webcal://" + page_url(band).split("://", 1)[1] + "concerts.ics",
         },
     )
 
 
+def embed_code(band: Band, template: str = "concerts/embed_code.html") -> str:
+    """Code a band pastes on its website: the widget, its height listener and the MusicEvent data.
+    The share page replaces __QUERY__ with the widget settings, __ALLOW__ with the "Near me" permission
+    and, in the iframe-only version (concerts/embed_iframe.html), __HEIGHT__ with a fixed height."""
+    site = urlparse(settings.SITE_URL)
+    return render_to_string(
+        template,
+        {
+            "band": band,
+            "frame_id": f"otr-{band.slug}",
+            "widget_url": f"{page_url(band)}widget/",
+            "events_url": f"{page_url(band)}events.json",
+            # An origin has no path, even when the site is published under one
+            "origin": f"{site.scheme}://{site.netloc}",
+        },
+    )
+
+
+def widget_page(band: Band, concerts: list[Concert]) -> str:
+    return render_to_string("concerts/widget.html", {"band": band, "concerts": concerts, "page_url": page_url(band)})
+
+
+def describe(concert: Concert) -> str:
+    """Extra information for feeds: status if not planned, and support acts."""
+    parts = [] if concert.status == Concert.Status.PLANNED else [Concert.Status(concert.status).label.capitalize()]
+    if concert.support_acts:
+        parts.append(f"with {concert.support_acts}")
+    return " · ".join(parts)
+
+
+def calendar(band: Band) -> bytes:
+    """iCal feed. Past concerts stay in it: a subscribed calendar drops whatever leaves the feed."""
+    # ponytail: every past concert, so the file grows ~400 bytes per concert and calendars re-download it
+    # every few hours; keep only the last 12 months or so once bands have hundreds of concerts
+    cal = Calendar()
+    cal.add("prodid", "-//OTR//concert dates//EN")
+    cal.add("version", "2.0")
+    cal.add("x-wr-calname", f"{band.name} concerts")
+    now = timezone.now()
+    for concert in band.concerts.select_related("venue"):
+        venue = concert.venue
+        event = Event()
+        event.add("uid", concert_uid(concert))
+        event.add("dtstamp", now)
+        event.add("dtstart", concert.starts_at)
+        if concert.ends_at:
+            event.add("dtend", concert.ends_at)
+        event.add("summary", f"{band.name} at {venue.name}")
+        city = f"{venue.postal_code} {venue.city}".strip()
+        event.add("location", ", ".join(part for part in (venue.name, venue.address, city) if part))
+        event.add("status", ICAL_STATUS[concert.status])
+        if concert.ticket_url:
+            event.add("url", concert.ticket_url)
+        if description := describe(concert):
+            event.add("description", description)
+        cal.add_component(event)
+    return cal.to_ical()
+
+
+def rss(band: Band, concerts: list[Concert]) -> str:
+    """RSS feed of upcoming concerts, latest announcements first."""
+    feed = Rss201rev2Feed(
+        title=f"{band.name} – upcoming concerts",
+        link=page_url(band),
+        description=f"Upcoming concerts of {band.name}",
+        language="en",
+    )
+    for concert in sorted(concerts, key=lambda concert: concert.announced_at, reverse=True):
+        date = dateformat.format(timezone.localtime(concert.starts_at), "D j M Y")
+        details = describe(concert)
+        feed.add_item(
+            title=f"{date} – {concert.venue.name}, {concert.venue.city}" + (f" ({details})" if details else ""),
+            link=concert.ticket_url or page_url(band),
+            description=details,
+            unique_id=concert_uid(concert),
+            unique_id_is_permalink=False,
+            pubdate=concert.announced_at,
+        )
+    return feed.writeString("utf-8")
+
+
 def build_band(band: Band) -> None:
-    path = settings.PUBLIC_DIR / band.slug / "index.html"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(band_page(band), encoding="utf-8")
+    concerts = list(upcoming_concerts(band))
+    # The band's links are loaded once, not once per concert
+    band_links = [link.url for link in band.links.all()]
+    events = [music_event(concert, band_links) for concert in concerts]
+    folder = settings.PUBLIC_DIR / band.slug
+    (folder / "widget").mkdir(parents=True, exist_ok=True)
+    (folder / "index.html").write_text(band_page(band, concerts, band_links), encoding="utf-8")
+    (folder / "widget" / "index.html").write_text(widget_page(band, concerts), encoding="utf-8")
+    # Same MusicEvent data as the page, for the band's own website (embed code)
+    (folder / "events.json").write_text(json_for_script(events), encoding="utf-8")
+    (folder / "concerts.ics").write_bytes(calendar(band))
+    (folder / "concerts.xml").write_text(rss(band, concerts), encoding="utf-8")
 
 
 def remove_band(slug: str) -> None:
@@ -108,7 +219,7 @@ def remove_band(slug: str) -> None:
 
 
 def build_all() -> None:
-    """Rebuild every page; also drops past dates and pages of renamed bands."""
+    """Rebuild every band's files; also drops past dates and folders of renamed bands."""
     settings.PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
     slugs: set[str] = set()
     for band in Band.objects.all():
