@@ -175,7 +175,10 @@ class Concert(models.Model):
     ticket_url = models.URLField(blank=True)
     free_entry = models.BooleanField(default=False)
     support_acts = models.CharField(max_length=300, blank=True)
-    announced_at = models.DateTimeField(default=timezone.now)
+    announced_at = models.DateTimeField(
+        default=timezone.now,
+        help_text="Shown as new for 14 days. Set an earlier date for a concert already announced elsewhere.",
+    )
 
     class Meta:
         ordering = ["starts_at"]

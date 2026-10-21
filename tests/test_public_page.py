@@ -112,8 +112,8 @@ def test_home_page_lists_bands(band, public_dir, django_capture_on_commit_callba
     with django_capture_on_commit_callbacks(execute=True):
         Band.objects.create(name="DVM Spero", slug="dvm-spero")
     home = (public_dir / "index.html").read_text()
-    assert '<a href="damantra/">Damantra</a>' in home
-    assert '<a href="dvm-spero/">DVM Spero</a>' in home
+    assert '<a class="name" href="damantra/">Damantra</a>' in home
+    assert '<a class="name" href="dvm-spero/">DVM Spero</a>' in home
     with django_capture_on_commit_callbacks(execute=True):
         Band.objects.get(slug="dvm-spero").delete()
     assert "DVM Spero" not in (public_dir / "index.html").read_text()
@@ -131,3 +131,17 @@ def test_build_all_removes_pages_of_renamed_bands(band, public_dir):
     public.build_all()
     assert (public_dir / "damantra" / "index.html").exists()
     assert not (public_dir / "old-slug").exists()
+
+
+def test_home_page_bands_sorted_by_next_show(band, venue, public_dir):
+    Band.objects.create(name="Faith In Agony", slug="faith-in-agony")
+    later = Band.objects.create(name="Splenius", slug="splenius")
+    Concert.objects.create(band=later, venue=venue, starts_at=timezone.now() + timedelta(days=30))
+    Concert.objects.create(band=band, venue=venue, starts_at=timezone.now() + timedelta(days=3))
+    public.build_home()
+    home = (public_dir / "index.html").read_text()
+    # Soonest show first; bands without one last
+    assert home.index(">Damantra<") < home.index(">Splenius<") < home.index(">Faith In Agony<")
+    assert "No upcoming shows" in home and "Next show: " in home
+    assert public.monogram(Band(name="Faith In Agony", slug="faith-in-agony"))["initials"] == "FA"
+    assert 'href="webcal://' in home

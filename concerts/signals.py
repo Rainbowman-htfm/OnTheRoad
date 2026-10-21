@@ -16,6 +16,7 @@ def rebuild(band_ids: Iterable[int]) -> None:
     def run() -> None:
         for band in Band.objects.filter(pk__in=band_ids):
             public.build_band(band)
+        public.build_home()  # its "just announced" list shows concerts of every band
 
     transaction.on_commit(run)
 
@@ -23,7 +24,6 @@ def rebuild(band_ids: Iterable[int]) -> None:
 @receiver(post_save, sender=Band)
 def band_saved(sender: type[Band], instance: Band, **kwargs: Any) -> None:
     rebuild([instance.pk])
-    transaction.on_commit(public.build_home)
 
 
 @receiver(post_delete, sender=Band)

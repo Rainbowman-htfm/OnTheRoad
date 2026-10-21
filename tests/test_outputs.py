@@ -233,3 +233,34 @@ def test_rescheduled_concert_shows_its_previous_date(site, band, venue):
     assert f"Rescheduled ({was})" in built(site, band, "concerts.xml")
     concert.status = Concert.Status.CANCELLED  # cancelled wins over rescheduled
     assert public.music_event(concert, [])["eventStatus"] == "https://schema.org/EventCancelled"
+
+
+def test_just_announced_on_home_page_feed_and_badge(site, band, venue, django_capture_on_commit_callbacks):
+    with django_capture_on_commit_callbacks(execute=True):
+        add_concert(band, venue, days=20)
+        # Entered today, but announced elsewhere a month ago: not new
+        add_concert(band, venue, days=30, announced_at=timezone.now() - timedelta(days=30))
+    home = (site / "index.html").read_text()
+    assert home.count("Damantra</strong></a>") == 1  # only the new concert in "Just announced"
+    assert (site / "damantra" / "index.html").read_text().count('class="new"') == 1
+    feed = ET.fromstring((site / "just-announced.xml").read_text())
+    assert [item.findtext("title", "").startswith("Damantra: ") for item in feed.iter("item")] == [True]
+
+
+def test_home_page_hides_just_announced_when_empty(site, band):
+    public.build_home()
+    assert "<h2>Just announced" not in (site / "index.html").read_text()
+
+
+def test_every_json_ld_block_on_the_page_is_a_complete_music_event(site, band, venue):
+    add_concert(band, venue, days=3, ticket_url="https://tickets.example/1")
+    add_concert(band, venue, days=5, status=Concert.Status.CANCELLED, time_tba=True)
+    page = built(site, band, "index.html")
+    blocks = re.findall(r'<script type="application/ld\+json">(.*?)</script>', page, re.DOTALL)
+    assert len(blocks) == 2
+    for event in map(json.loads, blocks):
+        assert event["@type"] == "MusicEvent"
+        assert {"name", "startDate", "eventStatus", "location", "performer"} <= event.keys()
+        assert event["location"]["@type"] == "MusicVenue" and event["location"]["address"]["addressLocality"]
+        assert event["performer"]["@type"] == "MusicGroup"
+    assert blocks[0].count("tickets.example") == 1  # offers.url when there is a ticket link

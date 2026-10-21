@@ -4,6 +4,7 @@ page, widget, iCal and RSS feeds, and the MusicEvent data as JSON."""
 import json
 import re
 import shutil
+import zlib
 from datetime import datetime, time, timedelta
 from typing import Any
 from urllib.parse import urlparse
@@ -71,15 +72,49 @@ def page_url(band: Band) -> str:
     return f"{site_url()}/{band.slug}/"
 
 
+def calendar_url(band: Band) -> str:
+    # webcal:// opens the phone's calendar app to subscribe, rather than downloading the file once
+    return "webcal://" + page_url(band).split("://", 1)[1] + "concerts.ics"
+
+
+def monogram(band: Band) -> dict[str, Any]:
+    """Initials of the first and last words ("Faith In Agony" → "FA"), with a colour that stays the same
+    for a band across builds: crc32 rather than hash(), which changes at every Python start."""
+    words = band.name.split() or ["?"]
+    initials = words[0][0] + (words[-1][0] if len(words) > 1 else "")
+    return {"initials": initials.upper(), "hue": zlib.crc32(band.slug.encode()) % 360}
+
+
 def concert_uid(concert: Concert) -> str:
     """Stable identifier, so calendars and feed readers update a concert instead of duplicating it."""
     return f"concert-{concert.pk}@{urlparse(settings.SITE_URL).hostname}"
 
 
+# How long a newly announced concert is shown as new; the nightly build removes the badge afterwards
+NEW_DAYS = 14
+
+
+def start_of_today() -> datetime:
+    # Concerts from the start of today, so tonight's concert stays on the page all day
+    return datetime.combine(timezone.localdate(), time.min, timezone.get_current_timezone())
+
+
+def new_since() -> datetime:
+    return timezone.now() - timedelta(days=NEW_DAYS)
+
+
 def upcoming_concerts(band: Band) -> QuerySet[Concert]:
-    # From the start of today, so tonight's concert stays on the page all day
-    today = datetime.combine(timezone.localdate(), time.min, timezone.get_current_timezone())
-    return band.concerts.filter(starts_at__gte=today).select_related("venue")
+    return band.concerts.filter(starts_at__gte=start_of_today()).select_related("venue")
+
+
+def just_announced() -> QuerySet[Concert]:
+    """Upcoming concerts of every band announced in the last NEW_DAYS days, latest first."""
+    return (
+        Concert.objects.filter(announced_at__gte=new_since(), starts_at__gte=start_of_today())
+        .exclude(status=Concert.Status.CANCELLED)
+        .select_related("band", "venue")
+        .order_by("-announced_at")
+    )
 
 
 def link_label(url: str) -> str:
@@ -159,8 +194,9 @@ def band_page(band: Band, concerts: list[Concert], band_links: list[str]) -> str
             "concerts": concerts,
             "events": [json_for_script(music_event(concert, band_links)) for concert in concerts],
             "links": [(url, link_label(url)) for url in links],
-            "calendar_url": "webcal://" + page_url(band).split("://", 1)[1] + "concerts.ics",
+            "calendar_url": calendar_url(band),
             "style": band_style(band),
+            "new_since": new_since(),
         },
     )
 
@@ -192,6 +228,7 @@ def widget_page(band: Band, concerts: list[Concert]) -> str:
             "page_url": page_url(band),
             "style": band_style(band),
             "choices": {"font": FONTS, "corners": RADIUS},
+            "new_since": new_since(),
         },
     )
 
@@ -244,20 +281,30 @@ def calendar(band: Band) -> bytes:
     return cal.to_ical()
 
 
-def rss(band: Band, concerts: list[Concert]) -> str:
-    """RSS feed of upcoming concerts, latest announcements first."""
-    feed = Rss201rev2Feed(
-        title=f"{band.name} – upcoming concerts",
-        link=page_url(band),
-        description=f"Upcoming concerts of {band.name}",
-        language="en",
-    )
+def rss(concerts: list[Concert], band: Band | None = None) -> str:
+    """RSS feed of upcoming concerts, latest announcements first: one band's, or the whole site's
+    recent announcements (band=None), whose items start with the band's name."""
+    if band:
+        feed = Rss201rev2Feed(
+            title=f"{band.name} – upcoming concerts",
+            link=page_url(band),
+            description=f"Upcoming concerts of {band.name}",
+            language="en",
+        )
+    else:
+        feed = Rss201rev2Feed(
+            title="Just announced",
+            link=site_url() + "/",
+            description="Concerts just announced by the bands on this site",
+            language="en",
+        )
     for concert in sorted(concerts, key=lambda concert: concert.announced_at, reverse=True):
         date = dateformat.format(timezone.localtime(concert.starts_at), "D j M Y")
         details = describe(concert)
+        title = f"{date} – {concert.venue.name}, {concert.venue.city}" + (f" ({details})" if details else "")
         feed.add_item(
-            title=f"{date} – {concert.venue.name}, {concert.venue.city}" + (f" ({details})" if details else ""),
-            link=concert.ticket_url or page_url(band),
+            title=title if band else f"{concert.band.name}: {title}",
+            link=concert.ticket_url or page_url(concert.band),
             description=details,
             unique_id=concert_uid(concert),
             unique_id_is_permalink=False,
@@ -278,18 +325,45 @@ def build_band(band: Band) -> None:
     # Same MusicEvent data as the page, for the band's own website (embed code)
     (folder / "events.json").write_text(json_for_script(events), encoding="utf-8")
     (folder / "concerts.ics").write_bytes(calendar(band))
-    (folder / "concerts.xml").write_text(rss(band, concerts), encoding="utf-8")
+    (folder / "concerts.xml").write_text(rss(concerts, band), encoding="utf-8")
 
 
 def remove_band(slug: str) -> None:
     shutil.rmtree(settings.PUBLIC_DIR / slug, ignore_errors=True)
 
 
+def home_bands() -> list[dict[str, Any]]:
+    """Every band with its next concert, soonest first; bands without one last, by name."""
+    upcoming = (
+        Concert.objects.filter(starts_at__gte=start_of_today())
+        .exclude(status=Concert.Status.CANCELLED)
+        .select_related("venue")
+        .order_by("starts_at")
+    )
+    next_concert: dict[int, Concert] = {}
+    for concert in upcoming:
+        next_concert.setdefault(concert.band_id, concert)
+    bands = [
+        {
+            "band": band,
+            "next": next_concert.get(band.pk),
+            "monogram": monogram(band),
+            "calendar_url": calendar_url(band),
+        }
+        for band in Band.objects.all()
+    ]
+    # Sorting is stable: bands keep their alphabetical order within each group
+    return sorted(bands, key=lambda item: (item["next"] is None, item["next"].starts_at if item["next"] else 0))
+
+
 def build_home() -> None:
-    """Home page listing the bands, at the root of PUBLIC_DIR."""
+    """Home page (just announced concerts, then the bands) and the site's "just announced" feed,
+    at the root of PUBLIC_DIR."""
     settings.PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
-    html = render_to_string("concerts/home.html", {"bands": Band.objects.all()})
+    announced = list(just_announced())
+    html = render_to_string("concerts/home.html", {"bands": home_bands(), "announced": announced})
     (settings.PUBLIC_DIR / "index.html").write_text(html, encoding="utf-8")
+    (settings.PUBLIC_DIR / "just-announced.xml").write_text(rss(announced), encoding="utf-8")
 
 
 def build_all() -> None:

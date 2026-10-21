@@ -59,6 +59,7 @@ class ConcertInline(admin.TabularInline):
         "ticket_url",
         "free_entry",
         "support_acts",
+        "announced_at",
     ]
     autocomplete_fields = ["venue"]
 

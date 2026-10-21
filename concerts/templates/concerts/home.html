@@ -3,23 +3,77 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Concert dates</title>
+<title>On the Road – concert dates from independent bands</title>
+<meta name="description" content="Concert dates from independent bands. Follow them without an account, without being tracked.">
+<link rel="alternate" type="application/rss+xml" title="Just announced" href="just-announced.xml">
 {% include "concerts/_style.html" %}
 <style>
 body { max-width: 54rem; margin: 0 auto; padding: 1rem; }
-.bands { list-style: none; padding: 0; }
-.bands li { padding: var(--pad) 0; border-bottom: 1px solid var(--line); }
+h1 { margin-bottom: .2rem; }
+h2 { margin-top: 2rem; }
+.bands, .announced { list-style: none; padding: 0; }
+.bands li, .announced li { padding: var(--pad) 0; border-bottom: 1px solid var(--line); }
+.bands li { display: flex; align-items: center; gap: .8rem; }
+.bands .name { display: block; font-weight: 700; }
+.bands .add { flex: none; font-size: .9em; }
+/* Monogram: the band's initials, no image to load; white on a mid-dark colour reads well */
+.mono { width: 2.6rem; height: 2.6rem; flex: none; display: grid; place-items: center; border-radius: 50%; font-weight: 700; color: #fff; }
+.principles li { margin-bottom: .4rem; }
+footer { margin-top: 2rem; font-size: .9em; }
 </style>
 </head>
 <body>
-<h1>Concert dates</h1>
-<p class="muted">Upcoming concerts of the bands on this site.</p>
+<h1>On the Road</h1>
+<p class="muted">Concert dates from independent bands. Follow them without an account, without being tracked.</p>
+
+{% if announced %}
+<h2>Just announced</h2>
+<ul class="announced">
+{% for concert in announced %}<li><a href="{{ concert.band.slug }}/"><strong>{{ concert.band.name }}</strong></a> · {% if concert.time_tba %}{{ concert.starts_at|date:"D j M" }}{% else %}{{ concert.starts_at|date:"D j M, H:i" }}{% endif %} · {{ concert.venue.name }}, {{ concert.venue.city }}</li>
+{% endfor %}</ul>
+<p class="muted">Follow new announcements: <a href="just-announced.xml">RSS</a></p>
+{% endif %}
+
+<h2>Bands</h2>
 {% if bands %}
 <ul class="bands">
-{% for band in bands %}<li><a href="{{ band.slug }}/">{{ band.name }}</a></li>
+{% for item in bands %}<li>
+  <span class="mono" style="background: hsl({{ item.monogram.hue }}, 45%, 38%)" aria-hidden="true">{{ item.monogram.initials }}</span>
+  <span class="info">
+    <a class="name" href="{{ item.band.slug }}/">{{ item.band.name }}</a>
+    <span class="muted">{% with concert=item.next %}{% if concert %}Next show: {{ concert.starts_at|date:"D j M" }} · {{ concert.venue.name }}, {{ concert.venue.city }}{% else %}No upcoming shows{% endif %}{% endwith %}</span>
+  </span>
+  <a class="add" href="{{ item.calendar_url }}">Add to my calendar</a>
+</li>
 {% endfor %}</ul>
 {% else %}
 <p>No bands yet.</p>
 {% endif %}
+
+<h2>Follow a band in one tap</h2>
+<p>Tap "Add to my calendar" on a band's page and their upcoming shows will appear in your phone's calendar — and stay up to date when dates change.</p>
+<p>No account to create. No email to give. We don't know who you are, and we like it that way.</p>
+
+<h2>For bands</h2>
+<p>Enter your dates once. You get:</p>
+<ul>
+  <li>a page to put in your Linktree or bio,</li>
+  <li>a widget for your own website,</li>
+  <li>a calendar feed your fans can follow,</li>
+  <li>structured data so search engines show your dates.</li>
+</ul>
+<p>Your data is yours: we never sell it or share it with partners. Like any concert announcement, your dates are public.</p>
+
+<h2>Our principles</h2>
+<ul class="principles">
+  <li><strong>No account for fans, no tracking.</strong> No trackers, no third-party services loaded by our pages. Only bands have an account, to manage their dates.</li>
+  <li><strong>Lightweight.</strong> Static pages of a few kilobytes: fast even in Instagram's in-app browser, with a minimal footprint.</li>
+  <li><strong>Independent.</strong> No ads, no data sold. Concert dates are public information; we don't monetise them.</li>
+  <li><strong>Open.</strong> Free software under the AGPL licence.</li>
+</ul>
+
+<footer class="muted">
+<p>Code under the AGPL-3.0 licence · No cookies, no analytics.</p>
+</footer>
 </body>
 </html>
