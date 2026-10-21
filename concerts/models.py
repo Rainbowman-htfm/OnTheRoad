@@ -155,7 +155,6 @@ class Concert(models.Model):
     class Status(models.TextChoices):
         PLANNED = "planned"
         CANCELLED = "cancelled"
-        POSTPONED = "postponed"
         SOLD_OUT = "sold_out", "sold out"
 
     # Deleting a band deletes its concerts; a venue that still has concerts cannot be deleted
@@ -163,6 +162,11 @@ class Concert(models.Model):
     venue = models.ForeignKey(Venue, on_delete=models.PROTECT, related_name="concerts")
     # Stored in UTC, displayed in the TIME_ZONE setting (USE_TZ = True)
     starts_at = models.DateTimeField()
+    # Filled in on save when the day changes, and kept through later moves: the date fans first had in mind.
+    # Editable, so a typo fixed right after entering the concert does not show as a reschedule
+    previous_starts_at = models.DateTimeField(
+        "previous date", null=True, blank=True, help_text="Set automatically when the day changes."
+    )
     # Optional: often unknown when a concert is announced
     ends_at = models.DateTimeField(null=True, blank=True)
     # The day is known but not the time: outputs show the date only, never the time in starts_at
@@ -186,3 +190,16 @@ class Concert(models.Model):
 
     def __str__(self) -> str:
         return f"{self.band} — {self.venue} — {timezone.localtime(self.starts_at):%Y-%m-%d}"
+
+    def save(self, *args: Any, **kwargs: Any) -> None:
+        if self.pk and self.previous_starts_at is None:
+            saved = Concert.objects.filter(pk=self.pk).values_list("starts_at", flat=True).first()
+            # The day, not the time: announcing the time of a "time TBA" concert is not a reschedule
+            if saved and timezone.localdate(saved) != timezone.localdate(self.starts_at):
+                self.previous_starts_at = saved
+        # Moved back to its first day: not rescheduled after all
+        if self.previous_starts_at and timezone.localdate(self.previous_starts_at) == timezone.localdate(
+            self.starts_at
+        ):
+            self.previous_starts_at = None
+        super().save(*args, **kwargs)

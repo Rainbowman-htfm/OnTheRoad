@@ -22,13 +22,11 @@ EVENT_STATUS: dict[str, str] = {
     Concert.Status.PLANNED: "EventScheduled",
     Concert.Status.SOLD_OUT: "EventScheduled",
     Concert.Status.CANCELLED: "EventCancelled",
-    Concert.Status.POSTPONED: "EventPostponed",
 }
 ICAL_STATUS: dict[str, str] = {
     Concert.Status.PLANNED: "CONFIRMED",
     Concert.Status.SOLD_OUT: "CONFIRMED",
     Concert.Status.CANCELLED: "CANCELLED",
-    Concert.Status.POSTPONED: "TENTATIVE",
 }
 
 
@@ -108,6 +106,7 @@ def music_event(concert: Concert, same_as: list[str]) -> dict[str, Any]:
             "longitude": float(venue.longitude),
         }
     performer: dict[str, Any] = {"@type": "MusicGroup", "name": band.name}
+    cancelled = concert.status == Concert.Status.CANCELLED
     if band.website:
         performer["url"] = band.website
     if same_as:
@@ -127,12 +126,15 @@ def music_event(concert: Concert, same_as: list[str]) -> dict[str, Any]:
             if concert.ends_at and not concert.time_tba
             else {}
         ),
-        "eventStatus": "https://schema.org/" + EVENT_STATUS[concert.status],
+        "eventStatus": "https://schema.org/"
+        + ("EventRescheduled" if concert.previous_starts_at and not cancelled else EVENT_STATUS[concert.status]),
         "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
         "location": location,
         "performer": performer,
         **({"isAccessibleForFree": True} if concert.free_entry else {}),
     }
+    if concert.previous_starts_at:
+        event["previousStartDate"] = timezone.localdate(concert.previous_starts_at).isoformat()
     if concert.ticket_url:
         sold_out = concert.status == Concert.Status.SOLD_OUT
         event["offers"] = {
@@ -195,8 +197,11 @@ def widget_page(band: Band, concerts: list[Concert]) -> str:
 
 
 def describe(concert: Concert) -> str:
-    """Extra information for feeds: status if not planned, free entry and support acts."""
+    """Extra information for feeds: status if not planned, previous date, free entry and support acts."""
     parts = [] if concert.status == Concert.Status.PLANNED else [Concert.Status(concert.status).label.capitalize()]
+    if concert.previous_starts_at:
+        was = dateformat.format(timezone.localtime(concert.previous_starts_at), "M j")
+        parts.append(f"Rescheduled (was {was})")
     if concert.free_entry:
         parts.append("Free entry")
     if concert.support_acts:

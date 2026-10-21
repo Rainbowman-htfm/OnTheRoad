@@ -218,3 +218,18 @@ def test_free_entry_shown_when_there_is_no_ticket_link(site, band, venue):
     free.ticket_url = "https://tickets.example/1"
     free.save()
     assert "Tickets" in built(site, band, "index.html")
+
+
+def test_rescheduled_concert_shows_its_previous_date(site, band, venue):
+    concert = add_concert(band, venue, days=10)
+    previous = concert.starts_at
+    concert.starts_at += timedelta(days=7)
+    concert.save()
+    event = public.music_event(concert, [])
+    assert event["eventStatus"] == "https://schema.org/EventRescheduled"
+    assert event["previousStartDate"] == timezone.localdate(previous).isoformat()
+    was = f"was {timezone.localtime(previous):%b} {timezone.localtime(previous).day}"
+    assert f"Rescheduled · {was}" in built(site, band, "index.html")
+    assert f"Rescheduled ({was})" in built(site, band, "concerts.xml")
+    concert.status = Concert.Status.CANCELLED  # cancelled wins over rescheduled
+    assert public.music_event(concert, [])["eventStatus"] == "https://schema.org/EventCancelled"

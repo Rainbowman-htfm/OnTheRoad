@@ -77,3 +77,27 @@ def test_starts_at_keeps_its_time_zone(concert):
     concert.refresh_from_db()
     assert concert.starts_at == datetime(2026, 11, 14, 19, 30, tzinfo=ZoneInfo("UTC"))
     assert concert.status == Concert.Status.PLANNED
+
+
+def test_moving_a_concert_to_another_day_keeps_its_first_date(concert):
+    first = concert.starts_at
+    concert.starts_at = first.replace(hour=21)  # the time only: not a reschedule
+    concert.save()
+    assert concert.previous_starts_at is None
+    concert.starts_at = first.replace(day=20)
+    concert.save()
+    concert.starts_at = first.replace(day=27)  # moved again: fans still remember the first date
+    concert.save()
+    assert concert.previous_starts_at == first.replace(hour=21)  # its date and time just before the first move
+    concert.starts_at = first  # back to its first day: not rescheduled after all
+    concert.save()
+    assert concert.previous_starts_at is None
+
+
+def test_previous_date_cleared_by_hand_stays_cleared(concert):
+    concert.starts_at = concert.starts_at.replace(day=20)  # a typo...
+    concert.save()
+    concert.previous_starts_at = None  # ...so the "previous date" is emptied in the admin
+    concert.save()
+    concert.refresh_from_db()
+    assert concert.previous_starts_at is None
