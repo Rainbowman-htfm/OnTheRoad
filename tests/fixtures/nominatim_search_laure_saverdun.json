@@ -1,0 +1,41 @@
+[
+    {
+        "place_id": 85589024,
+        "licence": "Data \u00a9 OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+        "osm_type": "relation",
+        "osm_id": 8513644,
+        "lat": "43.2155075",
+        "lon": "1.5292051",
+        "category": "waterway",
+        "type": "stream",
+        "place_rank": 21,
+        "importance": 0.42828097732087733,
+        "addresstype": "stream",
+        "name": "L'Aure",
+        "display_name": "L'Aure, Saverdun, Pamiers, Ari\u00e8ge, Occitanie, France m\u00e9tropolitaine, 09700, France",
+        "address": {
+            "stream": "L'Aure",
+            "village": "Saverdun",
+            "municipality": "Pamiers",
+            "county": "Ari\u00e8ge",
+            "ISO3166-2-lvl6": "FR-09",
+            "state": "Occitanie",
+            "ISO3166-2-lvl4": "FR-OCC",
+            "region": "France m\u00e9tropolitaine",
+            "postcode": "09700",
+            "country": "France",
+            "country_code": "fr"
+        },
+        "extratags": {
+            "wikidata": "Q16626536",
+            "wikipedia": "fr:Aure (rivi\u00e9re)",
+            "ref:sandre": "O1370590"
+        },
+        "boundingbox": [
+            "43.1565962",
+            "43.2505532",
+            "1.5167487",
+            "1.5756768"
+        ]
+    }
+]

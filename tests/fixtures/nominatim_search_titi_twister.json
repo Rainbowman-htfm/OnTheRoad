@@ -1,0 +1,45 @@
+[
+    {
+        "place_id": 89760441,
+        "licence": "Data \u00a9 OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+        "osm_type": "node",
+        "osm_id": 3772940557,
+        "lat": "45.2465439",
+        "lon": "5.6736365",
+        "category": "amenity",
+        "type": "bar",
+        "place_rank": 30,
+        "importance": 6.399252307922511e-05,
+        "addresstype": "amenity",
+        "name": "Titi Twister",
+        "display_name": "Titi Twister, 1, Rue du Cornillon, Fontanil-Cornillon, Grenoble, Is\u00e8re, Auvergne-Rh\u00f4ne-Alpes, France m\u00e9tropolitaine, 38120, France",
+        "address": {
+            "amenity": "Titi Twister",
+            "house_number": "1",
+            "road": "Rue du Cornillon",
+            "village": "Fontanil-Cornillon",
+            "municipality": "Grenoble",
+            "county": "Is\u00e8re",
+            "ISO3166-2-lvl6": "FR-38",
+            "state": "Auvergne-Rh\u00f4ne-Alpes",
+            "ISO3166-2-lvl4": "FR-ARA",
+            "region": "France m\u00e9tropolitaine",
+            "postcode": "38120",
+            "country": "France",
+            "country_code": "fr"
+        },
+        "extratags": {
+            "email": "contact@titi-twister.fr",
+            "phone": "+33 6 41 75 90 74",
+            "website": "https://www.titi-twister.fr/",
+            "live_music": "yes",
+            "opening_hours": "Th 18:00-01:00; Fr,Sa 20:00-03:00"
+        },
+        "boundingbox": [
+            "45.2464939",
+            "45.2465939",
+            "5.6735865",
+            "5.6736865"
+        ]
+    }
+]

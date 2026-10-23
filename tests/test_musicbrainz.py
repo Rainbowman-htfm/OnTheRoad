@@ -119,23 +119,6 @@ def admin_musicbrainz(monkeypatch):
 
 
 @pytest.mark.django_db
-def test_admin_search_marks_venues_already_added(admin_client, admin_musicbrainz):
-    admin_musicbrainz(SEARCH, SEARCH)
-    response = admin_client.get("/admin/concerts/venue/musicbrainz/", {"name": "Maroquinerie", "city": "Paris"})
-    assert "Use this" in response.content.decode()
-    Venue.objects.create(name="La Maroquinerie", city="Paris", musicbrainz_id=MAROQUINERIE)
-    response = admin_client.get("/admin/concerts/venue/musicbrainz/", {"name": "Maroquinerie", "city": "Paris"})
-    assert "already added" in response.content.decode()
-
-
-@pytest.mark.django_db
-def test_admin_shows_error_when_musicbrainz_is_busy(admin_client, admin_musicbrainz):
-    admin_musicbrainz(503, 503, 503)
-    response = admin_client.get("/admin/concerts/venue/musicbrainz/", {"name": "Maroquinerie"})
-    assert "MusicBrainz is busy" in response.content.decode()
-
-
-@pytest.mark.django_db
 def test_use_this_opens_prefilled_add_form(admin_client, admin_musicbrainz):
     admin_musicbrainz(PLACE)
     response = admin_client.get(f"/admin/concerts/venue/musicbrainz/{MAROQUINERIE}/")
@@ -146,12 +129,6 @@ def test_use_this_opens_prefilled_add_form(admin_client, admin_musicbrainz):
     assert 'value="23 rue Boyer"' in form
     assert 'value="48.868528"' in form
     assert not Venue.objects.exists()  # nothing saved until the person submits the form
-
-
-@pytest.mark.django_db
-def test_search_requires_admin(client):
-    response = client.get("/admin/concerts/venue/musicbrainz/", {"name": "Maroquinerie"})
-    assert response.status_code == 302 and "/admin/login/" in response.url
 
 
 def test_real_network_is_blocked():

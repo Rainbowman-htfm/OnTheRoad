@@ -52,14 +52,15 @@ def make_client(transport: httpx.BaseTransport | None = None) -> httpx.Client:
 
 
 def get_json(client: httpx.Client, path: str, params: dict[str, Any], retries: int = 2) -> Any:
-    """GET path, at most one request per second, waiting 2 then 4 s between retries."""
+    """GET path, at most one request per second, waiting 2 then 4 s between retries. Also used for Nominatim:
+    one limit for all outside services is simpler, and well within both rules."""
     global _last_request
     for attempt in range(retries + 1):
         # ponytail: per-process lock; several server processes would need a shared limiter
         with _lock:
             _sleep(max(0.0, MIN_INTERVAL - (time.monotonic() - _last_request)))
             try:
-                response = client.get(path, params={**params, "fmt": "json"})
+                response = client.get(path, params=params)
             except httpx.TransportError:
                 if attempt == retries:
                     raise
@@ -76,7 +77,7 @@ def _fetch(client: httpx.Client | None, path: str, params: dict[str, Any]) -> An
     try:
         # A client created here is closed after the request; one passed in belongs to the caller
         with nullcontext(client) if client else make_client() as http:
-            return get_json(http, path, params)
+            return get_json(http, path, {**params, "fmt": "json"})
     except httpx.HTTPStatusError as error:
         if error.response.status_code in RETRY_STATUSES:
             raise MusicBrainzError("MusicBrainz is busy, try again in a few seconds.") from error

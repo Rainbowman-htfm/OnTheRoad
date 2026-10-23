@@ -6,13 +6,14 @@ from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
 from django.core.exceptions import PermissionDenied
+from django.db.models import Q
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.template.response import TemplateResponse
 from django.urls import URLPattern, path, reverse
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
-from . import musicbrainz, public
+from . import musicbrainz, openstreetmap, public, venue_search
 from .models import Account, Band, BandLink, Concert, Membership, Venue, VenueLink
 
 
@@ -183,45 +184,73 @@ class VenueAdmin(admin.ModelAdmin):
 
     def get_urls(self) -> list[URLPattern]:
         return [
-            path(
-                "musicbrainz/", self.admin_site.admin_view(self.musicbrainz_search), name="concerts_venue_musicbrainz"
-            ),
+            path("search/", self.admin_site.admin_view(self.find_venue), name="concerts_venue_search"),
             path(
                 "musicbrainz/<uuid:mbid>/",
-                self.admin_site.admin_view(self.musicbrainz_use),
-                name="concerts_venue_musicbrainz_use",
+                self.admin_site.admin_view(self.musicbrainz_prefill),
+                name="concerts_venue_musicbrainz_prefill",
             ),
         ] + super().get_urls()
 
-    def musicbrainz_search(self, request: HttpRequest) -> HttpResponse:
-        """Search MusicBrainz places by name and city; nothing is saved here."""
+    def find_venue(self, request: HttpRequest) -> HttpResponse:
+        """Search MusicBrainz and OpenStreetMap by name and city, in one list; nothing is saved here."""
         if not self.has_add_permission(request):
             raise PermissionDenied
         name, city = request.GET.get("name", "").strip(), request.GET.get("city", "").strip()
-        results: list[musicbrainz.VenueFields] = []
+        found_musicbrainz: list[musicbrainz.VenueFields] = []
+        found_openstreetmap: list[openstreetmap.VenueFields] = []
         if name:
+            # One source down: the other's results still show
             try:
-                results = musicbrainz.search_places(name, city)
+                found_musicbrainz = musicbrainz.search_places(name, city)
             except musicbrainz.MusicBrainzError as error:
-                messages.error(request, str(error))
-        existing = Venue.objects.filter(musicbrainz_id__in=[result["musicbrainz_id"] for result in results])
-        known = {str(venue.musicbrainz_id): venue for venue in existing}
+                messages.warning(request, str(error))
+            try:
+                found_openstreetmap = openstreetmap.search_places(name, city)
+            except openstreetmap.OpenStreetMapError as error:
+                messages.warning(request, str(error))
+        results = venue_search.merge(found_musicbrainz, found_openstreetmap)
+        mbids = [result["musicbrainz_id"] for result in results if "musicbrainz_id" in result]
+        osm_ids = [result["osm_id"] for result in results if "osm_id" in result]
+        existing = Venue.objects.filter(Q(musicbrainz_id__in=mbids) | Q(osm_id__in=osm_ids))
+        known = {str(venue.musicbrainz_id): venue for venue in existing} | {venue.osm_id: venue for venue in existing}
+        rows = []
+        for result in results:
+            mbid, osm_id = result.get("musicbrainz_id"), result.get("osm_id")
+            sources = []
+            if mbid:
+                sources.append(("MusicBrainz", f"https://musicbrainz.org/place/{mbid}"))
+            if osm_id:
+                sources.append(("OpenStreetMap", f"https://www.openstreetmap.org/{osm_id}"))
+            initial = urlencode({key: value for key, value in result.items() if key != "type"})
+            rows.append(
+                {
+                    "result": result,
+                    "sources": sources,
+                    "venue": known.get(mbid or "") or known.get(osm_id or ""),
+                    # A MusicBrainz search has no website: "Use this" fetches the place first, passing on the rest
+                    "use_url": reverse("admin:concerts_venue_musicbrainz_prefill", args=[mbid]) + "?" + initial
+                    if mbid
+                    else reverse("admin:concerts_venue_add") + "?" + initial,
+                }
+            )
         return TemplateResponse(
             request,
-            "admin/concerts/venue/musicbrainz.html",
+            "admin/concerts/venue/search.html",
             {
                 **self.admin_site.each_context(request),
                 "opts": self.model._meta,
-                "title": "Search MusicBrainz",
+                "title": "Find a venue",
                 "name": name,
                 "city": city,
-                # Each result with the venue already added from it, if any
-                "results": [(result, known.get(result["musicbrainz_id"])) for result in results],
+                "rows": rows,
             },
         )
 
-    def musicbrainz_use(self, request: HttpRequest, mbid: UUID) -> HttpResponse:
-        """Open the usual "Add venue" form, pre-filled; the person checks it and saves."""
+    def musicbrainz_prefill(self, request: HttpRequest, mbid: UUID) -> HttpResponse:
+        """ "Use this" on a MusicBrainz result: its search results have no website, so fetch the place first,
+        then open the usual "Add venue" form, pre-filled; the person checks it and saves. (An OpenStreetMap
+        result already has everything: its "Use this" opens the form directly.)"""
         if not self.has_add_permission(request):
             raise PermissionDenied
         try:
@@ -229,8 +258,10 @@ class VenueAdmin(admin.ModelAdmin):
         except musicbrainz.MusicBrainzError as error:
             messages.error(request, str(error))
             return redirect(reverse("admin:concerts_venue_musicbrainz"))
-        # The admin "add" form reads initial values from the query string; "type" is not a Venue field
-        initial = {key: value for key, value in fields.items() if key != "type"}
+        # The admin "add" form reads initial values from the query string; "type" is not a Venue field.
+        # Values passed on from the search (the same venue on OpenStreetMap) fill what MusicBrainz lacks
+        found = {key: value for key, value in fields.items() if value and key != "type"}
+        initial = {key: value for key, value in request.GET.items() if key != "type"} | found
         return redirect(reverse("admin:concerts_venue_add") + "?" + urlencode(initial))
 
 

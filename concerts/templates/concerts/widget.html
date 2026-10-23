@@ -58,6 +58,7 @@ body { margin: 0; padding: .25rem .75rem; }
 <p class="muted">No upcoming concerts.</p>
 {% endif %}
 <a class="all" href="{{ page_url }}" target="_blank" rel="noopener">All dates →</a>
+{% include "concerts/_osm_credit.html" %}
 {% include "concerts/_near_me.html" %}
 <script>
 // Show only the first dates, then tell the band's page how tall the widget is

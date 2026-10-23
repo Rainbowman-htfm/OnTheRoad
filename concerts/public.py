@@ -72,6 +72,13 @@ def page_url(band: Band) -> str:
     return f"{site_url()}/{band.slug}/"
 
 
+def osm_credit(concerts: list[Concert]) -> str:
+    """OpenStreetMap's licence (ODbL) asks for a credit wherever its data is shown: "all" when every venue on
+    the page was imported from it, "some" when only some were, "" when none."""
+    from_osm = [bool(concert.venue.osm_id) for concert in concerts]
+    return "all" if from_osm and all(from_osm) else "some" if any(from_osm) else ""
+
+
 def calendar_url(band: Band) -> str:
     # webcal:// opens the phone's calendar app to subscribe, rather than downloading the file once
     return "webcal://" + page_url(band).split("://", 1)[1] + "concerts.ics"
@@ -197,6 +204,7 @@ def band_page(band: Band, concerts: list[Concert], band_links: list[str]) -> str
             "calendar_url": calendar_url(band),
             "style": band_style(band),
             "new_since": new_since(),
+            "osm_credit": osm_credit(concerts),
         },
     )
 
@@ -229,6 +237,7 @@ def widget_page(band: Band, concerts: list[Concert]) -> str:
             "style": band_style(band),
             "choices": {"font": FONTS, "corners": RADIUS},
             "new_since": new_since(),
+            "osm_credit": osm_credit(concerts),
         },
     )
 
@@ -361,7 +370,11 @@ def build_home() -> None:
     at the root of PUBLIC_DIR."""
     settings.PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
     announced = list(just_announced())
-    html = render_to_string("concerts/home.html", {"bands": home_bands(), "announced": announced})
+    bands = home_bands()
+    shown = announced + [item["next"] for item in bands if item["next"]]
+    html = render_to_string(
+        "concerts/home.html", {"bands": bands, "announced": announced, "osm_credit": osm_credit(shown)}
+    )
     (settings.PUBLIC_DIR / "index.html").write_text(html, encoding="utf-8")
     (settings.PUBLIC_DIR / "just-announced.xml").write_text(rss(announced), encoding="utf-8")
 

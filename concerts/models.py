@@ -127,6 +127,8 @@ class Venue(models.Model):
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
     # MusicBrainz "place" identifier
     musicbrainz_id = models.UUIDField("MusicBrainz ID", null=True, blank=True, unique=True)
+    # OpenStreetMap object, "node/3772940557"; null rather than empty so uniqueness ignores venues without one
+    osm_id = models.CharField("OpenStreetMap ID", max_length=30, null=True, blank=True, unique=True)
     website = models.URLField(blank=True)
 
     # Reverse relations, created by Django from the other side; declared for editors and type checkers

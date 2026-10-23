@@ -1,0 +1,51 @@
+[
+    {
+        "place_id": 426771953,
+        "licence": "Data \u00a9 OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+        "osm_type": "node",
+        "osm_id": 1402597553,
+        "lat": "48.8685287",
+        "lon": "2.3920592",
+        "category": "amenity",
+        "type": "music_venue",
+        "place_rank": 30,
+        "importance": 0.30663527500158994,
+        "addresstype": "amenity",
+        "name": "La Maroquinerie",
+        "display_name": "La Maroquinerie, 23, Rue Boyer, Quartier du P\u00e8re-Lachaise, Paris 20e Arrondissement, Paris, \u00cele-de-France, France m\u00e9tropolitaine, 75020, France",
+        "address": {
+            "amenity": "La Maroquinerie",
+            "house_number": "23",
+            "road": "Rue Boyer",
+            "city_block": "Quartier du P\u00e8re-Lachaise",
+            "suburb": "Paris 20e Arrondissement",
+            "city_district": "Paris",
+            "city": "Paris",
+            "ISO3166-2-lvl6": "FR-75C",
+            "state": "\u00cele-de-France",
+            "ISO3166-2-lvl4": "FR-IDF",
+            "region": "France m\u00e9tropolitaine",
+            "postcode": "75020",
+            "country": "France",
+            "country_code": "fr"
+        },
+        "extratags": {
+            "phone": "+33 1 40 33 35 05",
+            "twitter": "lamaroquinerie",
+            "website": "https://www.lamaroquinerie.fr/",
+            "operator": "Asterios Group",
+            "wikidata": "Q3210566",
+            "wikipedia": "fr:La Maroquinerie",
+            "check_date": "2024-04-13",
+            "wheelchair": "yes",
+            "contact:email": "Infos@lamaroquinerie.fr",
+            "contact:mastodon": "https://mastodon.social/@lamaroquinerie"
+        },
+        "boundingbox": [
+            "48.8684787",
+            "48.8685787",
+            "2.3920092",
+            "2.3921092"
+        ]
+    }
+]

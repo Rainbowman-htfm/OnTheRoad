@@ -1,0 +1,38 @@
+{% extends "admin/base_site.html" %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">Home</a> › <a href="{% url 'admin:concerts_venue_changelist' %}">Venues</a> › Find a venue
+</div>
+{% endblock %}
+{% block content %}
+<form method="get">
+  <p>
+    <label>Name <input name="name" value="{{ name }}" required autofocus></label>
+    <label>City <input name="city" value="{{ city }}"></label>
+    <button type="submit">Search</button>
+  </p>
+</form>
+{% if name %}
+  {% if rows %}
+  <table>
+    <thead><tr><th>Name</th><th>Found on</th><th>Type</th><th>Address</th><th>City</th><th>Coordinates</th><th></th></tr></thead>
+    <tbody>
+    {% for row in rows %}
+    <tr>
+      <td>{{ row.result.name }}</td>
+      <td>{% for label, url in row.sources %}<a href="{{ url }}" target="_blank" rel="noopener">{{ label }}</a>{% if not forloop.last %} + {% endif %}{% endfor %}</td>
+      <td>{{ row.result.type }}</td>
+      <td>{{ row.result.address }}</td>
+      <td>{{ row.result.postal_code }} {{ row.result.city }}</td>
+      <td>{% if row.result.latitude %}yes{% else %}—{% endif %}</td>
+      <td>{% if row.venue %}<a href="{% url 'admin:concerts_venue_change' row.venue.pk %}">already added</a>{% else %}<a class="button" href="{{ row.use_url }}">Use this</a>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% elif not messages %}
+  <p>No venue found. Try a shorter name, or leave the city empty.</p>
+  {% endif %}
+{% endif %}
+<p class="help">Data from <a href="https://musicbrainz.org" target="_blank" rel="noopener">MusicBrainz</a> (CC0) and © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> (ODbL), found with Nominatim. The same venue found on both is shown once; check the result before saving.</p>
+{% endblock %}
