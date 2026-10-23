@@ -57,13 +57,14 @@ if _site.scheme == "https":
 # Application definition
 
 INSTALLED_APPS = [
+    # First, so its templates can replace the admin's (the login page's link to email login)
+    "concerts",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "concerts",
 ]
 
 MIDDLEWARE = [
@@ -149,11 +150,28 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 # Email
 # https://docs.djangoproject.com/en/6.1/topics/email/#topic-email-configuration
 
+# Outgoing mail server for login links. Without EMAIL_HOST, emails are printed in the terminal (development)
+_email_host = os.environ.get("EMAIL_HOST", "")
+_email_port = int(os.environ.get("EMAIL_PORT", "587"))
 MAILERS = {
-    "default": {
-        "BACKEND": "django.core.mail.backends.console.EmailBackend",
-    },
+    "default": (
+        {
+            "BACKEND": "django.core.mail.backends.smtp.EmailBackend",
+            "OPTIONS": {
+                "host": _email_host,
+                "port": _email_port,
+                "username": os.environ.get("EMAIL_USER", ""),
+                "password": os.environ.get("EMAIL_PASSWORD", ""),
+                "use_tls": _email_port == 587,  # STARTTLS on the submission port
+                "use_ssl": _email_port == 465,
+                "timeout": 10,
+            },
+        }
+        if _email_host
+        else {"BACKEND": "django.core.mail.backends.console.EmailBackend"}
+    ),
 }
+DEFAULT_FROM_EMAIL = os.environ.get("EMAIL_USER") or "webmaster@localhost"
 
 # Account: user identified by email (see concerts/models.py)
 AUTH_USER_MODEL = "concerts.Account"
@@ -167,3 +185,6 @@ SERVE_FILES = DEBUG or os.environ.get("SERVE_FILES") == "1"
 # This instance's contact address: on the home page, and in the User-Agent sent to MusicBrainz and Nominatim,
 # which ask for a way to reach whoever runs the instance. Empty: no contact link, and the site's address instead
 CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "")
+
+# Login links sent by email: valid for 30 minutes, and only once (see concerts/login.py)
+PASSWORD_RESET_TIMEOUT = 30 * 60

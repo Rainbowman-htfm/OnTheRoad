@@ -1,0 +1,5 @@
+{% extends "admin/login.html" %}
+{% block content %}
+<p>Band member? <a href="{% url 'login' %}">Log in with a link sent by email</a>.</p>
+{{ block.super }}
+{% endblock %}

@@ -5,8 +5,13 @@ from django.urls import URLPattern, URLResolver, path
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.static import serve
 
+from concerts import login
+
 urlpatterns: list[URLPattern | URLResolver] = [
     path("admin/", admin.site.urls),
+    # Before the public files, which take every other address (bands cannot use these: RESERVED_SLUGS)
+    path("login/", login.ask_link, name="login"),
+    path("login/<str:uid>/<str:token>/", login.use_link, name="login_link"),
 ]
 
 

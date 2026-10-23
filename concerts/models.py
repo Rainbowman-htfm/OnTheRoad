@@ -2,6 +2,7 @@ from typing import TYPE_CHECKING, Any, ClassVar
 
 from django.conf import settings
 from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
 from django.utils import timezone
@@ -48,6 +49,15 @@ class Account(AbstractUser):
 hex_color = RegexValidator(r"^#[0-9a-fA-F]{6}$", "Enter a colour like #c4161c.")
 
 
+# Addresses used by the site itself: a band page there would be hidden by it (config/urls.py)
+RESERVED_SLUGS = {"admin", "login", "static"}
+
+
+def reserved_slug(value: str) -> None:
+    if value in RESERVED_SLUGS:
+        raise ValidationError("This address is used by the site itself; choose another one.")
+
+
 class Band(models.Model):
     class Theme(models.TextChoices):
         LIGHT = "light"
@@ -64,7 +74,12 @@ class Band(models.Model):
         ROUND = "round"
 
     name = models.CharField(max_length=200)
-    slug = models.SlugField(max_length=200, unique=True, help_text="Public page address: /<slug>/")
+    slug = models.SlugField(
+        max_length=200,
+        unique=True,
+        help_text="Public page address: /<slug>/",
+        validators=[reserved_slug],
+    )
     # MusicBrainz identifiers (MBID) are UUIDs; null rather than empty so uniqueness ignores bands without one
     musicbrainz_id = models.UUIDField("MusicBrainz ID", null=True, blank=True, unique=True)
     # Official site (schema.org "url"); other profiles go in BandLink (schema.org "sameAs")

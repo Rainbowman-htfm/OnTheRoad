@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Log in – On the Road</title>
+{% include "concerts/_style.html" %}
+<style>
+body { max-width: 26rem; margin: 0 auto; padding: 2rem 1rem; }
+input[type=email] { width: 100%; box-sizing: border-box; font: inherit; padding: .5rem; margin: .3rem 0 .8rem; }
+button { font: inherit; padding: .5rem 1.2rem; background: var(--accent); color: var(--on-accent); border: 0; border-radius: var(--radius); cursor: pointer; }
+</style>
+</head>
+<body>
+<h1>Log in</h1>
+{% if valid %}
+<p>Log in as <strong>{{ email }}</strong>?</p>
+<form method="post">{% csrf_token %}<button type="submit">Log in</button></form>
+{% else %}
+<p>This link no longer works: it has already been used, or it is more than 30 minutes old.</p>
+<p><a href="{% url 'login' %}">Get a new link</a></p>
+{% endif %}
+</body>
+</html>
