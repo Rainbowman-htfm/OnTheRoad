@@ -41,7 +41,7 @@ def waits(monkeypatch: pytest.MonkeyPatch) -> list[float]:
 
 
 def test_search_request_and_result(settings):
-    settings.MUSICBRAINZ_CONTACT = "contact@example.org"
+    settings.CONTACT_EMAIL = "contact@example.org"
     requests: list[httpx.Request] = []
     [place] = musicbrainz.search_places("Maroquinerie", "Paris", client=mb_client(SEARCH, requests=requests))
     request = requests[0]
@@ -134,3 +134,9 @@ def test_use_this_opens_prefilled_add_form(admin_client, admin_musicbrainz):
 def test_real_network_is_blocked():
     with pytest.raises(RuntimeError, match="Network access in tests"):
         musicbrainz.search_places("Le Plan", "", client=musicbrainz.make_client())
+
+
+def test_user_agent_falls_back_to_the_site_address(settings):
+    settings.CONTACT_EMAIL = ""
+    settings.SITE_URL = "https://dates.example"
+    assert musicbrainz.user_agent() == "OTR/0.1 ( https://dates.example )"

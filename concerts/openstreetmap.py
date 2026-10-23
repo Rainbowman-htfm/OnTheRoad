@@ -5,9 +5,8 @@ from contextlib import nullcontext
 from typing import Any, TypedDict
 
 import httpx
-from django.conf import settings
 
-from .musicbrainz import RETRY_STATUSES, get_json
+from .musicbrainz import RETRY_STATUSES, get_json, user_agent
 
 # Not venues: towns, roads, rivers, borders, land use…
 EXCLUDED = {"natural", "place", "highway", "waterway", "boundary", "landuse"}
@@ -33,11 +32,9 @@ class VenueFields(TypedDict):
 
 def make_client(transport: httpx.BaseTransport | None = None) -> httpx.Client:
     """transport: lets tests replace the network with httpx.MockTransport."""
-    contact = settings.MUSICBRAINZ_CONTACT  # the same contact address, which Nominatim also asks for
-    user_agent = f"OTR/0.1 ( {contact} )" if contact else "OTR/0.1"
     return httpx.Client(
         base_url="https://nominatim.openstreetmap.org/",
-        headers={"User-Agent": user_agent},
+        headers={"User-Agent": user_agent()},
         timeout=10,
         transport=transport,
     )

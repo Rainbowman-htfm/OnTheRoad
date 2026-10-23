@@ -145,3 +145,12 @@ def test_home_page_bands_sorted_by_next_show(band, venue, public_dir):
     assert "No upcoming shows" in home and "Next show: " in home
     assert public.monogram(Band(name="Faith In Agony", slug="faith-in-agony"))["initials"] == "FA"
     assert 'href="webcal://' in home
+
+
+def test_home_page_contact_only_when_configured(band, public_dir, settings):
+    settings.CONTACT_EMAIL = ""
+    public.build_home()
+    assert "mailto:" not in (public_dir / "index.html").read_text()
+    settings.CONTACT_EMAIL = "contact@example.org"
+    public.build_home()
+    assert (public_dir / "index.html").read_text().count('href="mailto:contact@example.org"') == 2

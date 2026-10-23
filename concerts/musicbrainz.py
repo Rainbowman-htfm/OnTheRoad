@@ -42,12 +42,15 @@ class PlaceFields(VenueFields):
     website: str
 
 
+def user_agent() -> str:
+    """How this instance introduces itself to outside services, with a way to reach whoever runs it."""
+    return f"OTR/0.1 ( {settings.CONTACT_EMAIL or settings.SITE_URL} )"
+
+
 def make_client(transport: httpx.BaseTransport | None = None) -> httpx.Client:
     """transport: lets tests replace the network with httpx.MockTransport."""
-    contact = settings.MUSICBRAINZ_CONTACT
-    user_agent = f"OTR/0.1 ( {contact} )" if contact else "OTR/0.1"
     return httpx.Client(
-        base_url="https://musicbrainz.org/ws/2/", headers={"User-Agent": user_agent}, timeout=10, transport=transport
+        base_url="https://musicbrainz.org/ws/2/", headers={"User-Agent": user_agent()}, timeout=10, transport=transport
     )
 
 

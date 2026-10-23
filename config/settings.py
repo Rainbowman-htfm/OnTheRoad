@@ -164,5 +164,6 @@ PUBLIC_DIR = BASE_DIR / "public"
 # without a separate web server (SERVE_FILES=1)
 SERVE_FILES = DEBUG or os.environ.get("SERVE_FILES") == "1"
 
-# Contact shown to MusicBrainz in the User-Agent header (an email or a URL), as they request
-MUSICBRAINZ_CONTACT = os.environ.get("MUSICBRAINZ_CONTACT", "")
+# This instance's contact address: on the home page, and in the User-Agent sent to MusicBrainz and Nominatim,
+# which ask for a way to reach whoever runs the instance. Empty: no contact link, and the site's address instead
+CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "")

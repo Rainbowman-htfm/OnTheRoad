@@ -25,7 +25,7 @@ def osm_client(*answers: object, requests: list[httpx.Request] | None = None) ->
 
 
 def test_search_request_and_result(settings):
-    settings.MUSICBRAINZ_CONTACT = "contact@example.org"
+    settings.CONTACT_EMAIL = "contact@example.org"
     requests: list[httpx.Request] = []
     [result] = openstreetmap.search_places(
         "Titi Twister", "Fontanil-Cornillon", osm_client(TITI_TWISTER, requests=requests)
