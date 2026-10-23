@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your data – On the Road</title>
+<meta name="description" content="What is public, what stays private, and under which licences.">
+{% include "concerts/_style.html" %}
+<style>
+body { max-width: 42rem; margin: 0 auto; padding: 1rem; }
+h2 { margin-top: 2rem; }
+li { margin-bottom: .4rem; }
+code { font-size: .9em; }
+</style>
+</head>
+<body>
+<p><a href="./">← On the Road</a></p>
+<h1>Your data</h1>
+
+<h2>For bands</h2>
+<ul>
+  <li><strong>Your concert dates are public.</strong> Like any concert announcement: dates, venues, times, ticket links and support acts appear on your page, your widget, your feeds and in search engines.</li>
+  <li><strong>They stay yours.</strong> Change or delete a date at any time: your page, your widget and your feeds follow, and so do your fans' calendars. Deleting your band deletes its pages.</li>
+  <li><strong>Your dates are always available in open formats</strong>, to take them elsewhere or feed other tools:
+    <ul>
+      <li><code>/&lt;your-band&gt;/concerts.ics</code>: every concert, past ones included, in the standard calendar format;</li>
+      <li><code>/&lt;your-band&gt;/events.json</code>: upcoming concerts in the schema.org format used by search engines.</li>
+    </ul>
+  </li>
+  <li><strong>Your account stays private.</strong> The email address you log in with, and which bands you belong to, are never published, sold or shared with partners.</li>
+</ul>
+
+<h2>For fans</h2>
+<ul>
+  <li><strong>No account, no email.</strong> You follow a band by adding its calendar or feed; we don't know who you are.</li>
+  <li><strong>No tracking.</strong> No cookies on public pages, no analytics, no third-party scripts, fonts or images. The only cookie is the login of band members, in the space where they manage their dates.</li>
+</ul>
+
+<h2>Licences</h2>
+<ul>
+  <li><strong>Concert dates and band information</strong> are released under <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0</a>: anyone can reuse them, without conditions.</li>
+  <li><strong>Venues imported from OpenStreetMap</strong> remain © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap contributors</a>, under the <a href="https://opendatacommons.org/licenses/odbl/">Open Database License</a>. Pages showing them say so.</li>
+  <li><strong>Venues imported from MusicBrainz</strong> come from <a href="https://musicbrainz.org">MusicBrainz</a>, under CC0.</li>
+  <li><strong>The code</strong> is free software under the AGPL-3.0 licence.</li>
+</ul>
+{% if contact %}
+<p>A question? <a href="mailto:{{ contact }}">Contact us</a>.</p>
+{% endif %}
+</body>
+</html>

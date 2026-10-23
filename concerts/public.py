@@ -366,8 +366,8 @@ def home_bands() -> list[dict[str, Any]]:
 
 
 def build_home() -> None:
-    """Home page (just announced concerts, then the bands) and the site's "just announced" feed,
-    at the root of PUBLIC_DIR."""
+    """Home page (just announced concerts, then the bands), the site's "just announced" feed and the
+    "Your data" page, at the root of PUBLIC_DIR."""
     settings.PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
     announced = list(just_announced())
     bands = home_bands()
@@ -378,6 +378,9 @@ def build_home() -> None:
     )
     (settings.PUBLIC_DIR / "index.html").write_text(html, encoding="utf-8")
     (settings.PUBLIC_DIR / "just-announced.xml").write_text(rss(announced), encoding="utf-8")
+    # A file, not a folder: no clash with a band called "data", and the nightly cleanup of folders leaves it
+    data_page = render_to_string("concerts/data.html", {"contact": settings.CONTACT_EMAIL})
+    (settings.PUBLIC_DIR / "data.html").write_text(data_page, encoding="utf-8")
 
 
 def build_all() -> None:

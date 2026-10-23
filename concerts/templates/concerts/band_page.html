@@ -29,6 +29,7 @@ footer { opacity: .7; }
 <footer><p>{% for url, label in links %}<a href="{{ url }}" rel="me noopener">{{ label }}</a>{% if not forloop.last %} · {% endif %}{% endfor %}</p></footer>
 {% endif %}
 {% include "concerts/_osm_credit.html" %}
+<p class="credit"><a href="../data.html">Your data</a> · <a href="../">On the Road</a></p>
 {% include "concerts/_near_me.html" %}
 </body>
 </html>

@@ -154,3 +154,11 @@ def test_home_page_contact_only_when_configured(band, public_dir, settings):
     settings.CONTACT_EMAIL = "contact@example.org"
     public.build_home()
     assert (public_dir / "index.html").read_text().count('href="mailto:contact@example.org"') == 2
+
+
+def test_your_data_page_is_linked_and_kept_by_the_nightly_build(band, public_dir):
+    public.build_all()
+    page = (public_dir / "data.html").read_text()
+    assert "CC0" in page and "OpenStreetMap contributors" in page
+    assert 'href="data.html"' in (public_dir / "index.html").read_text()
+    assert 'href="../data.html"' in (public_dir / "damantra" / "index.html").read_text()
