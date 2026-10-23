@@ -147,6 +147,8 @@ def music_event(concert: Concert, same_as: list[str]) -> dict[str, Any]:
             "latitude": float(venue.latitude),
             "longitude": float(venue.longitude),
         }
+    if venue.website:
+        location["url"] = venue.website
     performer: dict[str, Any] = {"@type": "MusicGroup", "name": band.name}
     cancelled = concert.status == Concert.Status.CANCELLED
     if band.website:

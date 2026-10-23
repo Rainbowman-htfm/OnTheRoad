@@ -29,7 +29,7 @@ footer { margin-top: 2rem; font-size: .9em; }
 {% if announced %}
 <h2>Just announced</h2>
 <ul class="announced">
-{% for concert in announced %}<li><a href="{{ concert.band.slug }}/"><strong>{{ concert.band.name }}</strong></a> · {% if concert.time_tba %}{{ concert.starts_at|date:"D j M" }}{% else %}{{ concert.starts_at|date:"D j M, H:i" }}{% endif %} · {{ concert.venue.name }}, {{ concert.venue.city }}</li>
+{% for concert in announced %}<li><a href="{{ concert.band.slug }}/"><strong>{{ concert.band.name }}</strong></a> · {% if concert.time_tba %}{{ concert.starts_at|date:"D j M" }}{% else %}{{ concert.starts_at|date:"D j M, H:i" }}{% endif %} · {% include "concerts/_venue.html" %}, {{ concert.venue.city }}</li>
 {% endfor %}</ul>
 <p class="muted">Follow new announcements: <a href="just-announced.xml">RSS</a></p>
 {% endif %}
@@ -41,7 +41,7 @@ footer { margin-top: 2rem; font-size: .9em; }
   <span class="mono" style="background: hsl({{ item.monogram.hue }}, 45%, 38%)" aria-hidden="true">{{ item.monogram.initials }}</span>
   <span class="info">
     <a class="name" href="{{ item.band.slug }}/">{{ item.band.name }}</a>
-    <span class="muted">{% with concert=item.next %}{% if concert %}Next show: {{ concert.starts_at|date:"D j M" }} · {{ concert.venue.name }}, {{ concert.venue.city }}{% else %}No upcoming shows{% endif %}{% endwith %}</span>
+    <span class="muted">{% with concert=item.next %}{% if concert %}Next show: {{ concert.starts_at|date:"D j M" }} · {% include "concerts/_venue.html" %}, {{ concert.venue.city }}{% else %}No upcoming shows{% endif %}{% endwith %}</span>
   </span>
   <a class="add" href="{{ item.calendar_url }}">Add to my calendar</a>
 </li>

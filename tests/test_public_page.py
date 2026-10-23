@@ -79,6 +79,20 @@ def test_music_event_block(band, venue):
     assert "offers" not in cancelled
 
 
+def test_venue_name_links_to_its_website(band, venue, public_dir):
+    other = Venue.objects.create(name="Le Gibus", city="Paris")
+    venue.website = "https://leplan.com"
+    venue.save()
+    add_concert(band, venue, days=1)
+    add_concert(band, other, days=2)
+    html = page(band)
+    assert '<a href="https://leplan.com" rel="noopener">Le Plan</a>' in html
+    assert "Le Gibus</a>" not in html  # no website: plain text
+    assert json_ld_blocks(html)[0]["location"]["url"] == "https://leplan.com"
+    public.build_home()
+    assert 'href="https://leplan.com"' in (public_dir / "index.html").read_text()
+
+
 def test_query_count_does_not_grow_with_concerts(band, venue, django_assert_num_queries):
     for days in range(1, 6):
         add_concert(band, venue, days=days)
