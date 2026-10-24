@@ -1,0 +1,80 @@
+[
+    {
+        "place_id": 97496514,
+        "licence": "Data \u00a9 OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+        "osm_type": "node",
+        "osm_id": 1989892331,
+        "lat": "48.8676035",
+        "lon": "2.3926820",
+        "category": "place",
+        "type": "house",
+        "place_rank": 30,
+        "importance": 9.317235065227768e-05,
+        "addresstype": "place",
+        "name": "",
+        "display_name": "12, Rue Boyer, Quartier du P\u00e8re-Lachaise, Paris 20e Arrondissement, Paris, \u00cele-de-France, France m\u00e9tropolitaine, 75020, France",
+        "address": {
+            "house_number": "12",
+            "road": "Rue Boyer",
+            "city_block": "Quartier du P\u00e8re-Lachaise",
+            "suburb": "Paris 20e Arrondissement",
+            "city_district": "Paris",
+            "city": "Paris",
+            "ISO3166-2-lvl6": "FR-75C",
+            "state": "\u00cele-de-France",
+            "ISO3166-2-lvl4": "FR-IDF",
+            "region": "France m\u00e9tropolitaine",
+            "postcode": "75020",
+            "country": "France",
+            "country_code": "fr"
+        },
+        "extratags": {
+            "entrance": "no"
+        },
+        "boundingbox": [
+            "48.8675535",
+            "48.8676535",
+            "2.3926320",
+            "2.3927320"
+        ]
+    },
+    {
+        "place_id": 98039055,
+        "licence": "Data \u00a9 OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+        "osm_type": "node",
+        "osm_id": 1989892442,
+        "lat": "48.8676666",
+        "lon": "2.3926556",
+        "category": "place",
+        "type": "house",
+        "place_rank": 30,
+        "importance": 9.317235065227768e-05,
+        "addresstype": "place",
+        "name": "",
+        "display_name": "12;12B;14, Rue Boyer, Quartier du P\u00e8re-Lachaise, Paris 20e Arrondissement, Paris, \u00cele-de-France, France m\u00e9tropolitaine, 75020, France",
+        "address": {
+            "house_number": "12;12B;14",
+            "road": "Rue Boyer",
+            "city_block": "Quartier du P\u00e8re-Lachaise",
+            "suburb": "Paris 20e Arrondissement",
+            "city_district": "Paris",
+            "city": "Paris",
+            "ISO3166-2-lvl6": "FR-75C",
+            "state": "\u00cele-de-France",
+            "ISO3166-2-lvl4": "FR-IDF",
+            "region": "France m\u00e9tropolitaine",
+            "postcode": "75020",
+            "country": "France",
+            "country_code": "fr"
+        },
+        "extratags": {
+            "entrance": "yes"
+        },
+        "boundingbox": [
+            "48.8676166",
+            "48.8677166",
+            "2.3926056",
+            "2.3927056"
+        ]
+    }
+]

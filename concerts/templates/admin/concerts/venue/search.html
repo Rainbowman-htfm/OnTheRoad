@@ -7,20 +7,23 @@
 {% block content %}
 <form method="get">
   <p>
-    <label>Name <input name="name" value="{{ name }}" required autofocus></label>
+    <label>Name <input name="name" value="{{ name }}" autofocus></label>
+    <label>Address <input name="address" value="{{ address }}" placeholder="23 rue Boyer"></label>
+    <label>Postal code <input name="postal_code" value="{{ postal_code }}" size="8"></label>
     <label>City <input name="city" value="{{ city }}"></label>
     {% for key, value in popup.items %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
     <button type="submit">Search</button>
   </p>
 </form>
-{% if name %}
+<p class="help">A name, an address, or both. Searching by address also finds a venue mapped under another name, and gives the coordinates of a venue missing from the map.</p>
+{% if name or address %}
   {% if rows %}
   <table>
     <thead><tr><th>Name</th><th>Found on</th><th>Type</th><th>Address</th><th>City</th><th>Coordinates</th><th></th></tr></thead>
     <tbody>
     {% for row in rows %}
     <tr>
-      <td>{{ row.result.name }}</td>
+      <td>{{ row.result.name|default:"—" }}</td>
       <td>{% for label, url in row.sources %}<a href="{{ url }}" target="_blank" rel="noopener">{{ label }}</a>{% if not forloop.last %} + {% endif %}{% endfor %}</td>
       <td>{{ row.result.type }}</td>
       <td>{{ row.result.address }}</td>
@@ -32,7 +35,7 @@
     </tbody>
   </table>
   {% elif not messages %}
-  <p>No venue found. Try a shorter name, or leave the city empty.</p>
+  <p>No venue found. Try a shorter name, search by address, or leave the city empty.</p>
   {% endif %}
 {% endif %}
 <p class="help">Data from <a href="https://musicbrainz.org" target="_blank" rel="noopener">MusicBrainz</a> (CC0) and © <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap contributors</a> (ODbL), found with Nominatim. The same venue found on both is shown once; check the result before saving.</p>

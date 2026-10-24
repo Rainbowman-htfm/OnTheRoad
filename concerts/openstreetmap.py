@@ -1,5 +1,5 @@
-"""Find venues on OpenStreetMap through Nominatim. Data under ODbL: "© OpenStreetMap contributors";
-read only, one search per click (Nominatim's rules forbid search-as-you-type)."""
+"""Find venues on OpenStreetMap through Nominatim, by name or by address. Data under ODbL:
+"© OpenStreetMap contributors"; read only, one search per click (Nominatim's rules forbid search-as-you-type)."""
 
 from contextlib import nullcontext
 from typing import Any, TypedDict
@@ -40,6 +40,19 @@ def make_client(transport: httpx.BaseTransport | None = None) -> httpx.Client:
     )
 
 
+def _search(params: dict[str, Any], client: httpx.Client | None) -> Any:
+    try:
+        # A client created here is closed after the request; one passed in belongs to the caller
+        with nullcontext(client) if client else make_client() as http:
+            return get_json(http, "search", {**params, "format": "jsonv2"})
+    except httpx.HTTPStatusError as error:
+        if error.response.status_code in RETRY_STATUSES:
+            raise OpenStreetMapError("OpenStreetMap is busy, try again in a few seconds.") from error
+        raise OpenStreetMapError(f"OpenStreetMap answered with error {error.response.status_code}.") from error
+    except httpx.TransportError as error:
+        raise OpenStreetMapError("OpenStreetMap could not be reached.") from error
+
+
 def _venue_fields(result: dict[str, Any]) -> VenueFields:
     address = result.get("address", {})
     tags = result.get("extratags") or {}
@@ -61,21 +74,38 @@ def _venue_fields(result: dict[str, Any]) -> VenueFields:
 def search_places(name: str, city: str, client: httpx.Client | None = None) -> list[VenueFields]:
     params = {
         "q": ", ".join(part for part in (name, city) if part),
-        "format": "jsonv2",
         "addressdetails": 1,  # street, postcode and town as separate fields
         "extratags": 1,  # the website
         "limit": 10,
     }
-    try:
-        # A client created here is closed after the request; one passed in belongs to the caller
-        with nullcontext(client) if client else make_client() as http:
-            results = get_json(http, "search", params)
-    except httpx.HTTPStatusError as error:
-        if error.response.status_code in RETRY_STATUSES:
-            raise OpenStreetMapError("OpenStreetMap is busy, try again in a few seconds.") from error
-        raise OpenStreetMapError(f"OpenStreetMap answered with error {error.response.status_code}.") from error
-    except httpx.TransportError as error:
-        raise OpenStreetMapError("OpenStreetMap could not be reached.") from error
-    return [
-        _venue_fields(result) for result in results if result.get("category") not in EXCLUDED and result.get("name")
-    ]
+    results = _search(params, client)
+    return [_venue_fields(result) for result in results if is_venue(result)]
+
+
+def is_venue(result: dict[str, Any]) -> bool:
+    return bool(result.get("name")) and result.get("category") not in EXCLUDED
+
+
+def search_address(address: str, postal_code: str, city: str, client: httpx.Client | None = None) -> list[VenueFields]:
+    """Venues at this address, and the address itself: a venue missing from OpenStreetMap still gets its
+    coordinates, since its street is usually there. A structured search (street, city) rather than free text."""
+    params = {
+        "street": address,
+        "postalcode": postal_code,
+        "city": city,
+        "addressdetails": 1,
+        "extratags": 1,
+        "limit": 5,
+    }
+    results = _search({key: value for key, value in params.items() if value}, client)
+    venues = [_venue_fields(result) for result in results if is_venue(result)]
+    # The address alone, once: a building is not the venue, so no name, website or OpenStreetMap ID. Its postal
+    # code is often missing from the map, and Nominatim then guesses it from the nearby postal areas, wrongly near
+    # a border (75002 for the Olympia, 75009): the one typed in, or none
+    plain = next((result for result in results if not is_venue(result)), None)
+    if plain:
+        venues.append(
+            _venue_fields(plain)
+            | {"osm_id": "", "name": "", "type": "address only", "website": "", "postal_code": postal_code}
+        )
+    return venues
