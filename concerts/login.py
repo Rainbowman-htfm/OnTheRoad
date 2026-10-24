@@ -16,6 +16,7 @@ from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 
 from .models import Account
+from .public import site_url
 
 
 def ask_link(request: HttpRequest) -> HttpResponse:
@@ -37,13 +38,13 @@ def ask_link(request: HttpRequest) -> HttpResponse:
 def send_link(account: Account) -> None:
     uid = urlsafe_base64_encode(force_bytes(account.pk))
     token = default_token_generator.make_token(account)
-    link = settings.SITE_URL.rstrip("/") + reverse("login_link", args=[uid, token])
+    link = site_url() + reverse("login_link", args=[uid, token])
     minutes = settings.PASSWORD_RESET_TIMEOUT // 60
     EmailMessage(
         subject="Your login link",
         body=f"To log in, open this link within {minutes} minutes:\n\n{link}\n\n"
         "It works only once. If you did not ask for it, ignore this email.\n\n"
-        f"First time? The guide for bands: {settings.SITE_URL.rstrip('/')}/guide.html",
+        f"First time? The guide for bands: {site_url()}/guide.html",
         to=[account.email],
         reply_to=[settings.CONTACT_EMAIL] if settings.CONTACT_EMAIL else [],
     ).send()

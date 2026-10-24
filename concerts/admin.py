@@ -19,6 +19,9 @@ from django.views.decorators.clickjacking import xframe_options_sameorigin
 from . import musicbrainz, openstreetmap, public, venue_search
 from .models import Account, Band, BandLink, Concert, Membership, Venue, VenueLink
 
+# "View site" in the admin, and the guide link on its home page: the public pages
+admin.site.site_url = public.site_url() + "/"
+
 
 @admin.register(Account)
 class AccountAdmin(UserAdmin):
