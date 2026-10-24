@@ -70,12 +70,12 @@ footer { margin-top: 2rem; font-size: .9em; }
   <li><strong>No account for fans, no tracking.</strong> No trackers, no third-party services loaded by our pages. Only bands have an account, to manage their dates.</li>
   <li><strong>Lightweight.</strong> Static pages of a few kilobytes: fast even in Instagram's in-app browser, with a minimal footprint.</li>
   <li><strong>Independent.</strong> No ads, no data sold. Concert dates are public information; we don't monetise them.</li>
-  <li><strong>Open.</strong> Free software under the AGPL licence.</li>
+  <li><strong>Open.</strong> Free software under the AGPL licence: <a href="{{ source }}">read the code</a>.</li>
 </ul>
 
 {% include "concerts/_osm_credit.html" %}
 <footer class="muted">
-<p>{% if contact %}<a href="mailto:{{ contact }}">Contact</a> · {% endif %}<a href="data.html">Your data</a> · Code under the AGPL-3.0 licence · No cookies on public pages, no analytics.</p>
+<p>{% if contact %}<a href="mailto:{{ contact }}">Contact</a> · {% endif %}<a href="data.html">Your data</a> · <a href="{{ source }}">Source code</a> (AGPL-3.0) · No cookies on public pages, no analytics.</p>
 </footer>
 </body>
 </html>

@@ -376,12 +376,20 @@ def build_home() -> None:
     shown = announced + [item["next"] for item in bands if item["next"]]
     html = render_to_string(
         "concerts/home.html",
-        {"bands": bands, "announced": announced, "osm_credit": osm_credit(shown), "contact": settings.CONTACT_EMAIL},
+        {
+            "bands": bands,
+            "announced": announced,
+            "osm_credit": osm_credit(shown),
+            "contact": settings.CONTACT_EMAIL,
+            "source": settings.SOURCE_URL,
+        },
     )
     (settings.PUBLIC_DIR / "index.html").write_text(html, encoding="utf-8")
     (settings.PUBLIC_DIR / "just-announced.xml").write_text(rss(announced), encoding="utf-8")
     # A file, not a folder: no clash with a band called "data", and the nightly cleanup of folders leaves it
-    data_page = render_to_string("concerts/data.html", {"contact": settings.CONTACT_EMAIL})
+    data_page = render_to_string(
+        "concerts/data.html", {"contact": settings.CONTACT_EMAIL, "source": settings.SOURCE_URL}
+    )
     (settings.PUBLIC_DIR / "data.html").write_text(data_page, encoding="utf-8")
 
 

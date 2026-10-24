@@ -176,3 +176,10 @@ def test_your_data_page_is_linked_and_kept_by_the_nightly_build(band, public_dir
     assert "CC0" in page and "OpenStreetMap contributors" in page
     assert 'href="data.html"' in (public_dir / "index.html").read_text()
     assert 'href="../data.html"' in (public_dir / "damantra" / "index.html").read_text()
+
+
+def test_source_code_linked_from_home_and_data_pages(public_dir, settings):
+    settings.SOURCE_URL = "https://code.example.org/otr"
+    public.build_home()
+    for page in ["index.html", "data.html"]:
+        assert 'href="https://code.example.org/otr"' in (public_dir / page).read_text()
