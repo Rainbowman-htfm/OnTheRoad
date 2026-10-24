@@ -34,6 +34,7 @@ def test_link_sent_to_a_member(client, member, settings):
     [message] = mail.outbox
     assert message.to == ["member@example.org"] and message.reply_to == ["contact@example.org"]
     assert "/login/" in message.body
+    assert "/guide.html" in message.body
 
 
 def test_same_answer_whether_the_address_has_an_account_or_not(client, member):

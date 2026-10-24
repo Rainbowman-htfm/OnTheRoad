@@ -368,8 +368,8 @@ def home_bands() -> list[dict[str, Any]]:
 
 
 def build_home() -> None:
-    """Home page (just announced concerts, then the bands), the site's "just announced" feed and the
-    "Your data" page, at the root of PUBLIC_DIR."""
+    """Home page (just announced concerts, then the bands), the site's "just announced" feed, the
+    "Your data" page and the guide for bands, at the root of PUBLIC_DIR."""
     settings.PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
     announced = list(just_announced())
     bands = home_bands()
@@ -391,6 +391,11 @@ def build_home() -> None:
         "concerts/data.html", {"contact": settings.CONTACT_EMAIL, "source": settings.SOURCE_URL}
     )
     (settings.PUBLIC_DIR / "data.html").write_text(data_page, encoding="utf-8")
+    guide = render_to_string(
+        "concerts/guide.html",
+        {"contact": settings.CONTACT_EMAIL, "minutes": settings.PASSWORD_RESET_TIMEOUT // 60},
+    )
+    (settings.PUBLIC_DIR / "guide.html").write_text(guide, encoding="utf-8")
 
 
 def build_all() -> None:
