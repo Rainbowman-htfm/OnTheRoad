@@ -131,6 +131,13 @@ def test_use_this_opens_prefilled_add_form(admin_client, admin_musicbrainz):
     assert not Venue.objects.exists()  # nothing saved until the person submits the form
 
 
+@pytest.mark.django_db
+def test_use_this_when_musicbrainz_is_down_goes_back_to_the_search(admin_client, admin_musicbrainz, waits):
+    admin_musicbrainz(503, 503, 503)
+    response = admin_client.get(f"/admin/concerts/venue/musicbrainz/{MAROQUINERIE}/")
+    assert response.url == "/admin/concerts/venue/search/"
+
+
 def test_real_network_is_blocked():
     with pytest.raises(RuntimeError, match="Network access in tests"):
         musicbrainz.search_places("Le Plan", "", client=musicbrainz.make_client())

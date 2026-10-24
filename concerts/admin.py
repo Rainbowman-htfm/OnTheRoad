@@ -283,7 +283,7 @@ class VenueAdmin(admin.ModelAdmin):
             fields = musicbrainz.place(str(mbid))
         except musicbrainz.MusicBrainzError as error:
             messages.error(request, str(error))
-            return redirect(reverse("admin:concerts_venue_musicbrainz"))
+            return redirect(reverse("admin:concerts_venue_search"))
         # The admin "add" form reads initial values from the query string; "type" is not a Venue field.
         # Values passed on from the search (the same venue on OpenStreetMap) fill what MusicBrainz lacks
         found = {key: value for key, value in fields.items() if value and key != "type"}
