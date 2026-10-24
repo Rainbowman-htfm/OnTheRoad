@@ -186,5 +186,9 @@ SERVE_FILES = DEBUG or os.environ.get("SERVE_FILES") == "1"
 # which ask for a way to reach whoever runs the instance. Empty: no contact link, and the site's address instead
 CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "")
 
+# The AGPL asks an instance to offer its users the source code it runs: an instance with its own changes
+# points this to its own copy
+SOURCE_URL = os.environ.get("SOURCE_URL", "https://github.com/Rainbowman-htfm/OnTheRoad")
+
 # Login links sent by email: valid for 30 minutes, and only once (see concerts/login.py)
 PASSWORD_RESET_TIMEOUT = 30 * 60
