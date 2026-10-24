@@ -71,17 +71,16 @@ def test_admin_search_lists_both_sources_once(admin_client, network):
     assert f'musicbrainz.org/place/{MAROQUINERIE}" target="_blank" rel="noopener">MusicBrainz</a> + <a' in page
 
 
-def test_use_this_on_a_merged_result_keeps_both_identifiers(admin_client, network):
-    network([SEARCH, PLACE], [OSM_MAROQUINERIE])
+def test_use_this_on_a_merged_result_needs_no_second_request(admin_client, network):
+    network([SEARCH], [OSM_MAROQUINERIE])  # no answer for a second MusicBrainz request
     page = search(admin_client, "La Maroquinerie")
-    use_url = next(
-        url.replace("&amp;", "&")
-        for url in page.split('class="button" href="')[1:]
-        if f"/musicbrainz/{MAROQUINERIE}/" in url.split('"')[0]
-    ).split('"')[0]
-    add_url = admin_client.get(use_url).url
-    initial = parse_qs(urlparse(add_url).query)
+    row = page[page.index(f"musicbrainz.org/place/{MAROQUINERIE}") :]
+    use_url = row.split('class="button" href="')[1].split('"')[0].replace("&amp;", "&")
+    # OpenStreetMap gave the website: straight to the form, with both identifiers
+    assert urlparse(use_url).path == "/admin/concerts/venue/add/"
+    initial = parse_qs(urlparse(use_url).query)
     assert initial["musicbrainz_id"] == [MAROQUINERIE] and initial["osm_id"] == ["node/1402597553"]
+    assert initial["website"] == ["https://www.lamaroquinerie.fr/"]
     assert not Venue.objects.exists()  # nothing saved until the person submits the form
 
 
