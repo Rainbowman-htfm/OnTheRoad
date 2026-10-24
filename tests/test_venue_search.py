@@ -119,3 +119,38 @@ def test_public_pages_credit_openstreetmap_only_when_needed(settings, tmp_path):
     assert ">Venue data © " in public.band_page(band, list(public.upcoming_concerts(band)), [])
     public.build_home()  # "Next show" shows a venue from OpenStreetMap
     assert "OpenStreetMap contributors" in (tmp_path / "index.html").read_text()
+
+
+# From a concert, "+" next to the venue opens "Add venue" in a small window marked with these parameters
+POPUP = {"_popup": "1", "_to_field": "id"}
+
+
+def test_find_link_in_the_small_window_keeps_it_small(admin_client):
+    page = admin_client.get("/admin/concerts/venue/add/", POPUP).content.decode()
+    assert 'href="/admin/concerts/venue/search/?_popup=1&amp;_to_field=id"' in page
+
+
+def test_use_this_in_the_small_window_saves_into_the_concert(admin_client, network):
+    network([{"places": []}], [OSM_TITI_TWISTER])
+    page = admin_client.get("/admin/concerts/venue/search/", {"name": "Titi Twister", **POPUP}).content.decode()
+    assert '<input type="hidden" name="_popup" value="1">' in page  # a new search stays in the window
+    use_url = page.split('class="button" href="')[1].split('"')[0].replace("&amp;", "&")
+    assert parse_qs(urlparse(use_url).query)["_popup"] == ["1"]
+    form = admin_client.get(use_url).content.decode()
+    assert 'name="_popup"' in form  # Django then closes the window after "Save" and fills in the venue
+
+
+def test_musicbrainz_use_this_in_the_small_window_keeps_it_small(admin_client, network):
+    network([PLACE], [])
+    add_url = admin_client.get(f"/admin/concerts/venue/musicbrainz/{MAROQUINERIE}/", POPUP).url
+    assert parse_qs(urlparse(add_url).query)["_popup"] == ["1"]
+
+
+def test_venue_already_added_is_picked_into_the_concert(admin_client, network):
+    venue = Venue.objects.create(name="Titi Twister", city="Fontanil-Cornillon", osm_id="node/3772940557")
+    network([{"places": []}], [OSM_TITI_TWISTER])
+    page = admin_client.get("/admin/concerts/venue/search/", {"name": "Titi Twister", **POPUP}).content.decode()
+    pick_url = f"/admin/concerts/venue/{venue.pk}/pick/?_popup=1&amp;_to_field=id"
+    assert pick_url in page
+    response = admin_client.get(pick_url.replace("&amp;", "&")).content.decode()
+    assert "data-popup-response" in response and f"&quot;value&quot;: &quot;{venue.pk}&quot;" in response
