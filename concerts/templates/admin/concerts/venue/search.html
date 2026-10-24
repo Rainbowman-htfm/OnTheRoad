@@ -9,6 +9,7 @@
   <p>
     <label>Name <input name="name" value="{{ name }}" required autofocus></label>
     <label>City <input name="city" value="{{ city }}"></label>
+    {% for key, value in popup.items %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
     <button type="submit">Search</button>
   </p>
 </form>
@@ -25,7 +26,7 @@
       <td>{{ row.result.address }}</td>
       <td>{{ row.result.postal_code }} {{ row.result.city }}</td>
       <td>{% if row.result.latitude %}yes{% else %}—{% endif %}</td>
-      <td>{% if row.venue %}<a href="{% url 'admin:concerts_venue_change' row.venue.pk %}">already added</a>{% else %}<a class="button" href="{{ row.use_url }}">Use this</a>{% endif %}</td>
+      <td>{% if row.venue %}<a href="{{ row.venue_url }}">already added</a>{% else %}<a class="button" href="{{ row.use_url }}">Use this</a>{% endif %}</td>
     </tr>
     {% endfor %}
     </tbody>

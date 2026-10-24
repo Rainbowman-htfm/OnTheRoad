@@ -1,4 +1,4 @@
 {% extends "admin/change_form.html" %}
 {% block form_top %}
-<p><a href="{% url 'admin:concerts_venue_search' %}">Find this venue on MusicBrainz and OpenStreetMap</a> to fill in this form.</p>
+<p><a href="{% url 'admin:concerts_venue_search' %}{% if is_popup %}?_popup=1{% if to_field %}&amp;_to_field={{ to_field|urlencode }}{% endif %}{% endif %}">Find this venue on MusicBrainz and OpenStreetMap</a> to fill in this form.</p>
 {% endblock %}

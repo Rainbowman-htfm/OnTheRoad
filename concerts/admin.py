@@ -1,3 +1,4 @@
+import json
 from collections.abc import Sequence
 from typing import Any
 from urllib.parse import urlencode
@@ -5,6 +6,7 @@ from uuid import UUID
 
 from django import forms
 from django.contrib import admin, messages
+from django.contrib.admin.options import IS_POPUP_VAR, TO_FIELD_VAR
 from django.contrib.auth.admin import UserAdmin
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q, QuerySet
@@ -200,6 +202,13 @@ class BandAdmin(admin.ModelAdmin):
         )
 
 
+def popup_markers(request: HttpRequest) -> dict[str, str]:
+    """The search opened from the "+" next to a concert's venue, in a small window: Django marks such pages with
+    these parameters. They travel along the search, so that saving the venue, or picking one already added,
+    puts it into the concert and closes the window."""
+    return {key: request.GET[key] for key in (IS_POPUP_VAR, TO_FIELD_VAR) if key in request.GET}
+
+
 @admin.register(Venue)
 class VenueAdmin(admin.ModelAdmin):
     list_display = ["name", "city", "postal_code"]
@@ -216,6 +225,7 @@ class VenueAdmin(admin.ModelAdmin):
                 self.admin_site.admin_view(self.musicbrainz_prefill),
                 name="concerts_venue_musicbrainz_prefill",
             ),
+            path("<int:venue_id>/pick/", self.admin_site.admin_view(self.pick), name="concerts_venue_pick"),
         ] + super().get_urls()
 
     def find_venue(self, request: HttpRequest) -> HttpResponse:
@@ -223,6 +233,7 @@ class VenueAdmin(admin.ModelAdmin):
         if not self.has_add_permission(request):
             raise PermissionDenied
         name, city = request.GET.get("name", "").strip(), request.GET.get("city", "").strip()
+        popup = popup_markers(request)
         found_musicbrainz: list[musicbrainz.VenueFields] = []
         found_openstreetmap: list[openstreetmap.VenueFields] = []
         if name:
@@ -248,12 +259,21 @@ class VenueAdmin(admin.ModelAdmin):
                 sources.append(("MusicBrainz", f"https://musicbrainz.org/place/{mbid}"))
             if osm_id:
                 sources.append(("OpenStreetMap", f"https://www.openstreetmap.org/{osm_id}"))
-            initial = urlencode({key: value for key, value in result.items() if key != "type"})
+            initial = urlencode({key: value for key, value in result.items() if key != "type"} | popup)
+            venue = known.get(mbid or "") or known.get(osm_id or "")
+            venue_url = ""
+            if venue:
+                venue_url = (
+                    reverse("admin:concerts_venue_pick", args=[venue.pk]) + "?" + urlencode(popup)
+                    if popup
+                    else reverse("admin:concerts_venue_change", args=[venue.pk])
+                )
             rows.append(
                 {
                     "result": result,
                     "sources": sources,
-                    "venue": known.get(mbid or "") or known.get(osm_id or ""),
+                    "venue": venue,
+                    "venue_url": venue_url,
                     # A MusicBrainz search has no website: "Use this" fetches the place first, passing on the rest
                     "use_url": reverse("admin:concerts_venue_musicbrainz_prefill", args=[mbid]) + "?" + initial
                     if mbid
@@ -270,6 +290,8 @@ class VenueAdmin(admin.ModelAdmin):
                 "name": name,
                 "city": city,
                 "rows": rows,
+                "popup": popup,
+                "is_popup": bool(popup),  # the admin then leaves out its header, as in its own small windows
             },
         )
 
@@ -283,12 +305,22 @@ class VenueAdmin(admin.ModelAdmin):
             fields = musicbrainz.place(str(mbid))
         except musicbrainz.MusicBrainzError as error:
             messages.error(request, str(error))
-            return redirect(reverse("admin:concerts_venue_search"))
+            popup = popup_markers(request)
+            return redirect(reverse("admin:concerts_venue_search") + ("?" + urlencode(popup) if popup else ""))
         # The admin "add" form reads initial values from the query string; "type" is not a Venue field.
         # Values passed on from the search (the same venue on OpenStreetMap) fill what MusicBrainz lacks
         found = {key: value for key, value in fields.items() if value and key != "type"}
         initial = {key: value for key, value in request.GET.items() if key != "type"} | found
         return redirect(reverse("admin:concerts_venue_add") + "?" + urlencode(initial))
+
+    def pick(self, request: HttpRequest, venue_id: int) -> HttpResponse:
+        """In the small window opened from a concert: put a venue already added into the concert, with the
+        same page Django shows after saving a new one there, which fills the field and closes the window."""
+        venue = get_object_or_404(Venue, pk=venue_id)
+        if not self.has_view_permission(request, venue):
+            raise PermissionDenied
+        data = json.dumps({"value": str(venue.pk), "obj": str(venue)})
+        return TemplateResponse(request, "admin/popup_response.html", {"popup_response_data": data})
 
 
 @admin.register(Concert)
