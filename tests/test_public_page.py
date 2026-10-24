@@ -190,6 +190,7 @@ def test_guide_for_bands_is_built_and_linked(public_dir, client, settings):
     public.build_home()
     guide = (public_dir / "guide.html").read_text()
     assert "Finding the venue" in guide and "30 minutes" in guide and "mailto:contact@example.org" in guide
+    assert f'"New" for {public.NEW_DAYS} days' in guide
     assert 'href="guide.html"' in (public_dir / "index.html").read_text()
     client.force_login(Account.objects.create_superuser("admin@example.org"))
-    assert 'href="/guide.html"' in client.get("/admin/").content.decode()
+    assert f'href="{public.site_url()}/guide.html"' in client.get("/admin/").content.decode()

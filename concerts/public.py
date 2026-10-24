@@ -393,7 +393,11 @@ def build_home() -> None:
     (settings.PUBLIC_DIR / "data.html").write_text(data_page, encoding="utf-8")
     guide = render_to_string(
         "concerts/guide.html",
-        {"contact": settings.CONTACT_EMAIL, "minutes": settings.PASSWORD_RESET_TIMEOUT // 60},
+        {
+            "contact": settings.CONTACT_EMAIL,
+            "minutes": settings.PASSWORD_RESET_TIMEOUT // 60,
+            "new_days": NEW_DAYS,
+        },
     )
     (settings.PUBLIC_DIR / "guide.html").write_text(guide, encoding="utf-8")
 
