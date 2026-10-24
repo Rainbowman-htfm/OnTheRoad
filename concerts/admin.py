@@ -297,9 +297,10 @@ class VenueAdmin(admin.ModelAdmin):
                     "sources": sources,
                     "venue": venue,
                     "venue_url": venue_url,
-                    # A MusicBrainz search has no website: "Use this" fetches the place first, passing on the rest
+                    # A MusicBrainz search has no website: unless OpenStreetMap gave one, "Use this" fetches the
+                    # place first, passing on the rest
                     "use_url": reverse("admin:concerts_venue_musicbrainz_prefill", args=[mbid]) + "?" + initial
-                    if mbid
+                    if mbid and not result.get("website")
                     else reverse("admin:concerts_venue_add") + "?" + initial,
                 }
             )
@@ -321,21 +322,21 @@ class VenueAdmin(admin.ModelAdmin):
         )
 
     def musicbrainz_prefill(self, request: HttpRequest, mbid: UUID) -> HttpResponse:
-        """ "Use this" on a MusicBrainz result: its search results have no website, so fetch the place first,
-        then open the usual "Add venue" form, pre-filled; the person checks it and saves. (An OpenStreetMap
-        result already has everything: its "Use this" opens the form directly.)"""
+        """ "Use this" on a MusicBrainz result without a website: its search results have none, so fetch the
+        place first, then open the usual "Add venue" form, pre-filled; the person checks it and saves. (Other
+        results already have everything: their "Use this" opens the form directly.)"""
         if not self.has_add_permission(request):
             raise PermissionDenied
+        # The admin "add" form reads initial values from the query string; "type" is not a Venue field.
+        # The search passed on what it found, so the form opens even if MusicBrainz does not answer now
+        initial: dict[str, Any] = {key: value for key, value in request.GET.items() if key != "type"}
+        initial["musicbrainz_id"] = str(mbid)
         try:
             fields = musicbrainz.place(str(mbid))
         except musicbrainz.MusicBrainzError as error:
-            messages.error(request, str(error))
-            popup = popup_markers(request)
-            return redirect(reverse("admin:concerts_venue_search") + ("?" + urlencode(popup) if popup else ""))
-        # The admin "add" form reads initial values from the query string; "type" is not a Venue field.
-        # Values passed on from the search (the same venue on OpenStreetMap) fill what MusicBrainz lacks
-        found = {key: value for key, value in fields.items() if value and key != "type"}
-        initial = {key: value for key, value in request.GET.items() if key != "type"} | found
+            messages.warning(request, f"{error} The website could not be fetched: add it if you know it.")
+        else:
+            initial |= {key: value for key, value in fields.items() if value and key != "type"}
         return redirect(reverse("admin:concerts_venue_add") + "?" + urlencode(initial))
 
     def pick(self, request: HttpRequest, venue_id: int) -> HttpResponse:

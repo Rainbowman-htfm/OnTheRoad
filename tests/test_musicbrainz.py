@@ -132,10 +132,14 @@ def test_use_this_opens_prefilled_add_form(admin_client, admin_musicbrainz):
 
 
 @pytest.mark.django_db
-def test_use_this_when_musicbrainz_is_down_goes_back_to_the_search(admin_client, admin_musicbrainz, waits):
+def test_use_this_when_musicbrainz_is_down_still_opens_the_form(admin_client, admin_musicbrainz, waits):
     admin_musicbrainz(503, 503, 503)
-    response = admin_client.get(f"/admin/concerts/venue/musicbrainz/{MAROQUINERIE}/")
-    assert response.url == "/admin/concerts/venue/search/"
+    response = admin_client.get(f"/admin/concerts/venue/musicbrainz/{MAROQUINERIE}/", {"name": "La Maroquinerie"})
+    initial = parse_qs(urlparse(response.url).query)
+    assert urlparse(response.url).path == "/admin/concerts/venue/add/"
+    assert initial["name"] == ["La Maroquinerie"] and initial["musicbrainz_id"] == [MAROQUINERIE]
+    page = admin_client.get(response.url).content.decode()
+    assert "The website could not be fetched" in page
 
 
 def test_real_network_is_blocked():
