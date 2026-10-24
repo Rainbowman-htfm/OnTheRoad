@@ -6,7 +6,7 @@ import pytest
 from django.utils import timezone
 
 from concerts import public
-from concerts.models import Band, Concert, Venue
+from concerts.models import Account, Band, Concert, Venue
 
 pytestmark = pytest.mark.django_db
 
@@ -183,3 +183,13 @@ def test_source_code_linked_from_home_and_data_pages(public_dir, settings):
     public.build_home()
     for page in ["index.html", "data.html"]:
         assert 'href="https://code.example.org/otr"' in (public_dir / page).read_text()
+
+
+def test_guide_for_bands_is_built_and_linked(public_dir, client, settings):
+    settings.CONTACT_EMAIL = "contact@example.org"
+    public.build_home()
+    guide = (public_dir / "guide.html").read_text()
+    assert "Finding the venue" in guide and "30 minutes" in guide and "mailto:contact@example.org" in guide
+    assert 'href="guide.html"' in (public_dir / "index.html").read_text()
+    client.force_login(Account.objects.create_superuser("admin@example.org"))
+    assert 'href="/guide.html"' in client.get("/admin/").content.decode()

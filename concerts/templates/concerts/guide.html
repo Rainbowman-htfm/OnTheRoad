@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Guide for bands – On the Road</title>
+<meta name="description" content="How to log in, add your concerts, find venues and share your dates.">
+{% include "concerts/_style.html" %}
+<style>
+body { max-width: 42rem; margin: 0 auto; padding: 1rem; }
+h2 { margin-top: 2rem; }
+li { margin-bottom: .4rem; }
+nav ol { padding-left: 1.2rem; }
+</style>
+</head>
+<body>
+<p><a href="./">← On the Road</a></p>
+<h1>Guide for bands</h1>
+<p>Enter a date once: your page, your widget and your fans' calendars follow.</p>
+<nav>
+<ol>
+  <li><a href="#log-in">Logging in</a></li>
+  <li><a href="#concert">Adding a concert</a></li>
+  <li><a href="#venue">Finding the venue</a></li>
+  <li><a href="#changes">When plans change</a></li>
+  <li><a href="#share">Sharing your dates</a></li>
+</ol>
+</nav>
+
+<h2 id="log-in">1. Logging in</h2>
+<ul>
+  <li>Go to <a href="login/">the login page</a> and enter your email address. There is no password.</li>
+  <li>You receive an email with a link. It works for {{ minutes }} minutes, and only once.</li>
+  <li>Open it and press <strong>Log in</strong>. Asking for a new link any time is fine.</li>
+</ul>
+
+<h2 id="concert">2. Adding a concert</h2>
+<ol>
+  <li>Open <strong>Bands</strong>, then your band.</li>
+  <li>Under <strong>Concerts</strong>, fill in the empty block, or press <strong>Add another concert</strong>.</li>
+  <li>Press <strong>Save</strong> at the bottom. Your page is updated right away.</li>
+</ol>
+<p>What each field means:</p>
+<ul>
+  <li><strong>Date and time</strong>: when you play, or when doors open if that is what you announce.</li>
+  <li><strong>Time not announced yet</strong>: tick it when only the day is known. Your page then shows the day without a time.</li>
+  <li><strong>End</strong>: optional.</li>
+  <li><strong>Venue</strong>: see <a href="#venue">the next section</a>.</li>
+  <li><strong>Status</strong>: planned, sold out (the ticket button disappears) or cancelled.</li>
+  <li><strong>Ticket link</strong>, or tick <strong>Free entry</strong>.</li>
+  <li><strong>Support acts</strong>: the other bands of the night, separated by commas.</li>
+</ul>
+
+<h2 id="venue">3. Finding the venue</h2>
+<p>Venues are shared between all bands: someone may already have added yours.</p>
+<ol>
+  <li>In the concert's <strong>Venue</strong> field, start typing the venue's name. If it appears, choose it: you are done.</li>
+  <li>If not, press the <strong>+</strong> next to the field. A small window opens.</li>
+  <li>In that window, press <strong>Find this venue on MusicBrainz and OpenStreetMap</strong>.</li>
+  <li>Search with a short name and the city: "Maroquinerie" and "Paris" rather than the full name.</li>
+  <li>Check the address of the result, then press <strong>Use this</strong>. The form is filled in for you.</li>
+  <li>Check it and press <strong>Save</strong>. The window closes and the venue is in your concert.</li>
+</ol>
+<ul>
+  <li><strong>"already added"</strong> in the results: the venue exists already. Press it to choose it.</li>
+  <li><strong>Nothing found?</strong> Go back to the form and fill it in yourself: the name and the city are enough.</li>
+  <li><strong>A mistake in a venue?</strong> Venues are shared, so you cannot change them.{% if contact %} <a href="mailto:{{ contact }}">Tell us</a> and we will fix it.{% endif %}</li>
+</ul>
+
+<h2 id="changes">4. When plans change</h2>
+<ul>
+  <li><strong>Cancelled</strong>: set the status to cancelled rather than deleting the concert. It stays on your page, crossed out, so fans who saw it know.</li>
+  <li><strong>New date</strong>: just change the date. Your page shows "Rescheduled · was" with the first date, and calendars move the concert.</li>
+  <li><strong>A typo in the date</strong>, corrected right away? Open <strong>More</strong> in the concert's block and empty <strong>Previous date</strong>: it will not show as rescheduled.</li>
+  <li><strong>Announced elsewhere before</strong>? New concerts are marked "New" for 14 days. In <strong>More</strong>, set <strong>Announced at</strong> to an earlier date to avoid it.</li>
+  <li><strong>Delete</strong> a concert only if it was entered by mistake.</li>
+</ul>
+
+<h2 id="share">5. Sharing your dates</h2>
+<p>On your band's page in the admin, at the top right:</p>
+<ul>
+  <li><strong>Share</strong>:
+    <ul>
+      <li>the link to your page, for your bio or Linktree;</li>
+      <li>the widget for your website, with a preview and the code to copy;</li>
+      <li>your calendar and RSS feeds.</li>
+    </ul>
+  </li>
+  <li><strong>Page style</strong>: theme, colours, font and corners of your page, with a preview.</li>
+</ul>
+<p>Fans tap <strong>Add to my calendar</strong> on your page: your next concerts appear in their calendar and follow your changes. They need no account.</p>
+
+<h2>Your data</h2>
+<p>Your dates are public, like any concert announcement, and stay yours. <a href="data.html">What we do with your data</a>.</p>
+{% if contact %}
+<p>A question? <a href="mailto:{{ contact }}">Contact us</a>.</p>
+{% endif %}
+</body>
+</html>

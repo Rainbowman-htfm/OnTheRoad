@@ -42,7 +42,8 @@ def send_link(account: Account) -> None:
     EmailMessage(
         subject="Your login link",
         body=f"To log in, open this link within {minutes} minutes:\n\n{link}\n\n"
-        "It works only once. If you did not ask for it, ignore this email.",
+        "It works only once. If you did not ask for it, ignore this email.\n\n"
+        f"First time? The guide for bands: {settings.SITE_URL.rstrip('/')}/guide.html",
         to=[account.email],
         reply_to=[settings.CONTACT_EMAIL] if settings.CONTACT_EMAIL else [],
     ).send()
