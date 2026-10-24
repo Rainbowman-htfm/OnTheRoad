@@ -178,18 +178,18 @@ class Concert(models.Model):
     band = models.ForeignKey(Band, on_delete=models.CASCADE, related_name="concerts")
     venue = models.ForeignKey(Venue, on_delete=models.PROTECT, related_name="concerts")
     # Stored in UTC, displayed in the TIME_ZONE setting (USE_TZ = True)
-    starts_at = models.DateTimeField()
+    starts_at = models.DateTimeField("date and time")
     # Filled in on save when the day changes, and kept through later moves: the date fans first had in mind.
     # Editable, so a typo fixed right after entering the concert does not show as a reschedule
     previous_starts_at = models.DateTimeField(
         "previous date", null=True, blank=True, help_text="Set automatically when the day changes."
     )
     # Optional: often unknown when a concert is announced
-    ends_at = models.DateTimeField(null=True, blank=True)
+    ends_at = models.DateTimeField("end", null=True, blank=True)
     # The day is known but not the time: outputs show the date only, never the time in starts_at
     time_tba = models.BooleanField("time not announced yet", default=False)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PLANNED)
-    ticket_url = models.URLField(blank=True)
+    ticket_url = models.URLField("ticket link", blank=True)
     free_entry = models.BooleanField(default=False)
     support_acts = models.CharField(max_length=300, blank=True)
     announced_at = models.DateTimeField(

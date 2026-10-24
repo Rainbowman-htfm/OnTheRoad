@@ -1,3 +1,4 @@
+from collections.abc import Sequence
 from typing import Any
 from urllib.parse import urlencode
 from uuid import UUID
@@ -6,7 +7,7 @@ from django import forms
 from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin
 from django.core.exceptions import PermissionDenied
-from django.db.models import Q
+from django.db.models import Q, QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.template.response import TemplateResponse
@@ -47,22 +48,36 @@ class VenueLinkInline(admin.TabularInline):
     extra = 1
 
 
-class ConcertInline(admin.TabularInline):
+class ConcertInline(admin.StackedInline):
+    """One block per concert rather than a wide table: easier to read and fill in on a phone."""
+
     model = Concert
     extra = 1
-    fields = [
-        "starts_at",
-        "time_tba",
-        "previous_starts_at",
-        "ends_at",
-        "venue",
-        "status",
-        "ticket_url",
-        "free_entry",
-        "support_acts",
-        "announced_at",
+    fieldsets = [
+        (
+            None,
+            {
+                "fields": [
+                    ("starts_at", "time_tba"),
+                    "ends_at",
+                    "venue",
+                    "status",
+                    ("ticket_url", "free_entry"),
+                    "support_acts",
+                ]
+            },
+        ),
+        # Rarely needed: the previous date is set on its own, cleared by hand only to undo a typo
+        ("More", {"fields": ["previous_starts_at", "announced_at"], "classes": ["collapse"]}),
     ]
     autocomplete_fields = ["venue"]
+
+
+def member_bands(request: HttpRequest) -> QuerySet[Band]:
+    """The bands this account may manage: all of them for a superuser, otherwise the ones it is a member of."""
+    if request.user.is_superuser:
+        return Band.objects.all()
+    return Band.objects.filter(members=request.user.pk)
 
 
 class StyleForm(forms.ModelForm):
@@ -103,6 +118,17 @@ class BandAdmin(admin.ModelAdmin):
     inlines = [ConcertInline, BandLinkInline, MembershipInline]
     fields = ["name", "slug", "musicbrainz_id", "website"]  # the style has its own page
 
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Band]:
+        # Also used by the change, delete and autocomplete views: other bands are "not found"
+        return super().get_queryset(request).filter(pk__in=member_bands(request))
+
+    def get_readonly_fields(self, request: HttpRequest, obj: Band | None = None) -> list[str]:
+        # Changing the address would break fans' subscribed feeds: only an administrator does it
+        return [] if request.user.is_superuser else ["slug"]
+
+    def get_prepopulated_fields(self, request: HttpRequest, obj: Band | None = None) -> dict[str, Sequence[str]]:
+        return self.prepopulated_fields if request.user.is_superuser else {}
+
     def get_urls(self) -> list[URLPattern]:
         return [
             path("<int:band_id>/share/", self.admin_site.admin_view(self.share), name="concerts_band_share"),
@@ -117,7 +143,7 @@ class BandAdmin(admin.ModelAdmin):
 
     def style(self, request: HttpRequest, band_id: int) -> HttpResponse:
         """Page style with a live preview; saving rebuilds the public page like any band change."""
-        band = get_object_or_404(Band, pk=band_id)
+        band = get_object_or_404(self.get_queryset(request), pk=band_id)
         if not self.has_change_permission(request, band):
             raise PermissionDenied
         form = StyleForm(request.POST or None, instance=band)
@@ -141,7 +167,7 @@ class BandAdmin(admin.ModelAdmin):
 
     def style_preview(self, request: HttpRequest, band_id: int) -> HttpResponse:
         """The band page with the style from the address, without saving it."""
-        band = get_object_or_404(Band, pk=band_id)
+        band = get_object_or_404(self.get_queryset(request), pk=band_id)
         if not self.has_change_permission(request, band):
             raise PermissionDenied
         form = StyleForm(request.GET, instance=band)
@@ -151,7 +177,7 @@ class BandAdmin(admin.ModelAdmin):
 
     def share(self, request: HttpRequest, band_id: int) -> HttpResponse:
         """Links, widget settings with a live preview, and the code to paste on the band's website."""
-        band = get_object_or_404(Band, pk=band_id)
+        band = get_object_or_404(self.get_queryset(request), pk=band_id)
         if not self.has_view_permission(request, band):
             raise PermissionDenied
         concerts = list(public.upcoming_concerts(band))
@@ -268,7 +294,16 @@ class VenueAdmin(admin.ModelAdmin):
 @admin.register(Concert)
 class ConcertAdmin(admin.ModelAdmin):
     list_display = ["starts_at", "band", "venue", "status"]
-    list_filter = ["status", "band", "venue__city"]
+    list_filter = ["status", ("band", admin.RelatedOnlyFieldListFilter), "venue__city"]
     search_fields = ["band__name", "venue__name", "venue__city", "support_acts"]
     date_hierarchy = "starts_at"
     autocomplete_fields = ["band", "venue"]
+
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Concert]:
+        return super().get_queryset(request).filter(band__in=member_bands(request))
+
+    def formfield_for_foreignkey(self, db_field: Any, request: HttpRequest, **kwargs: Any) -> Any:
+        # The form refuses any other band, even one typed into the request by hand
+        if db_field.name == "band":
+            kwargs["queryset"] = member_bands(request)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
