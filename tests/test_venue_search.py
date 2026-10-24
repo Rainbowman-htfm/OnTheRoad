@@ -154,3 +154,33 @@ def test_venue_already_added_is_picked_into_the_concert(admin_client, network):
     assert pick_url in page
     response = admin_client.get(pick_url.replace("&amp;", "&")).content.decode()
     assert "data-popup-response" in response and f"&quot;value&quot;: &quot;{venue.pk}&quot;" in response
+
+
+RUE_BOYER_12 = json.loads((FIXTURES / "nominatim_address_12_rue_boyer.json").read_text())
+
+
+def test_search_by_address_alone_fills_in_coordinates_and_the_name_searched(admin_client, network):
+    network([{"places": []}], [[], RUE_BOYER_12])
+    page = admin_client.get(
+        "/admin/concerts/venue/search/", {"name": "Le Petit Bain", "address": "12 rue Boyer", "city": "Paris"}
+    ).content.decode()
+    assert "address only" in page and "mlat=48.867604" in page
+    use_url = page.split('class="button" href="')[1].split('"')[0].replace("&amp;", "&")
+    initial = parse_qs(urlparse(use_url).query)
+    assert initial["name"] == ["Le Petit Bain"] and initial["latitude"] == ["48.867604"]
+    assert "osm_id" not in initial  # the building is not the venue
+
+
+def test_search_by_address_without_a_name(admin_client, network):
+    network([], [RUE_BOYER_12])
+    page = admin_client.get("/admin/concerts/venue/search/", {"address": "12 rue Boyer", "city": "Paris"})
+    assert "address only" in page.content.decode()
+
+
+def test_venue_found_by_name_and_by_address_is_listed_once(admin_client, network):
+    rue_boyer_23 = json.loads((FIXTURES / "nominatim_address_rue_boyer.json").read_text())
+    network([{"places": []}], [OSM_MAROQUINERIE, rue_boyer_23])
+    page = admin_client.get(
+        "/admin/concerts/venue/search/", {"name": "La Maroquinerie", "address": "23 rue Boyer", "city": "Paris"}
+    ).content.decode()
+    assert page.count("openstreetmap.org/node/1402597553") == 1

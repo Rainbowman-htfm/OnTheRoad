@@ -54,3 +54,33 @@ def test_places_roads_and_rivers_are_not_venues():
 def test_busy_server_gives_a_readable_error():
     with pytest.raises(openstreetmap.OpenStreetMapError, match="busy"):
         openstreetmap.search_places("Titi Twister", "", osm_client(503, 503, 503))
+
+
+# 23 rue Boyer: La Maroquinerie, and the building's address. 12 rue Boyer: two entrances of a building, no venue
+RUE_BOYER_23 = json.loads((FIXTURES / "nominatim_address_rue_boyer.json").read_text())
+RUE_BOYER_12 = json.loads((FIXTURES / "nominatim_address_12_rue_boyer.json").read_text())
+
+
+def test_address_of_a_mapped_venue_finds_it():
+    requests: list[httpx.Request] = []
+    venue, plain = openstreetmap.search_address(
+        "23 rue Boyer", "", "Paris", client=osm_client(RUE_BOYER_23, requests=requests)
+    )
+    assert venue["name"] == "La Maroquinerie" and venue["osm_id"] == "node/1402597553"
+    assert venue["website"] == "https://www.lamaroquinerie.fr/"
+    assert plain["type"] == "address only" and plain["name"] == "" and plain["osm_id"] == ""
+    sent = parse_qs(requests[0].url.query.decode())
+    assert sent["street"] == ["23 rue Boyer"] and sent["city"] == ["Paris"]
+
+
+def test_address_alone_gives_coordinates_once():
+    requests: list[httpx.Request] = []
+    client = osm_client(RUE_BOYER_12, RUE_BOYER_12, requests=requests)
+    [plain] = openstreetmap.search_address("12 rue Boyer", "75020", "Paris", client=client)
+    assert plain["type"] == "address only" and plain["osm_id"] == ""
+    assert (plain["address"], plain["postal_code"], plain["city"]) == ("12 Rue Boyer", "75020", "Paris")
+    assert parse_qs(requests[0].url.query.decode())["postalcode"] == ["75020"]
+    # Without one typed in, none: the map's may be a guess
+    [plain] = openstreetmap.search_address("12 rue Boyer", "", "Paris", client=client)
+    assert plain["postal_code"] == ""
+    assert (plain["latitude"], plain["longitude"]) == ("48.867604", "2.392682")

@@ -232,10 +232,13 @@ class VenueAdmin(admin.ModelAdmin):
         ] + super().get_urls()
 
     def find_venue(self, request: HttpRequest) -> HttpResponse:
-        """Search MusicBrainz and OpenStreetMap by name and city, in one list; nothing is saved here."""
+        """Search MusicBrainz and OpenStreetMap by name, and OpenStreetMap by address, in one list; nothing is
+        saved here."""
         if not self.has_add_permission(request):
             raise PermissionDenied
-        name, city = request.GET.get("name", "").strip(), request.GET.get("city", "").strip()
+        name, address, postal_code, city = (
+            request.GET.get(key, "").strip() for key in ("name", "address", "postal_code", "city")
+        )
         popup = popup_markers(request)
         found_musicbrainz: list[musicbrainz.VenueFields] = []
         found_openstreetmap: list[openstreetmap.VenueFields] = []
@@ -249,9 +252,18 @@ class VenueAdmin(admin.ModelAdmin):
                 found_openstreetmap = openstreetmap.search_places(name, city)
             except openstreetmap.OpenStreetMapError as error:
                 messages.warning(request, str(error))
+        if address:
+            try:
+                at_address = openstreetmap.search_address(address, postal_code, city)
+            except openstreetmap.OpenStreetMapError as error:
+                messages.warning(request, str(error))
+            else:
+                # A venue found by both its name and its address is listed once
+                seen = {result["osm_id"] for result in found_openstreetmap}
+                found_openstreetmap += [result for result in at_address if result["osm_id"] not in seen]
         results = venue_search.merge(found_musicbrainz, found_openstreetmap)
-        mbids = [result["musicbrainz_id"] for result in results if "musicbrainz_id" in result]
-        osm_ids = [result["osm_id"] for result in results if "osm_id" in result]
+        mbids = [result["musicbrainz_id"] for result in results if result.get("musicbrainz_id")]
+        osm_ids = [result["osm_id"] for result in results if result.get("osm_id")]
         existing = Venue.objects.filter(Q(musicbrainz_id__in=mbids) | Q(osm_id__in=osm_ids))
         known = {str(venue.musicbrainz_id): venue for venue in existing} | {venue.osm_id: venue for venue in existing}
         rows = []
@@ -262,7 +274,15 @@ class VenueAdmin(admin.ModelAdmin):
                 sources.append(("MusicBrainz", f"https://musicbrainz.org/place/{mbid}"))
             if osm_id:
                 sources.append(("OpenStreetMap", f"https://www.openstreetmap.org/{osm_id}"))
-            initial = urlencode({key: value for key, value in result.items() if key != "type"} | popup)
+            elif not mbid:  # the address alone: its place on the map, to check it
+                lat, lon = result["latitude"], result["longitude"]
+                sources.append(
+                    ("OpenStreetMap", f"https://www.openstreetmap.org/?mlat={lat}&mlon={lon}#map=19/{lat}/{lon}")
+                )
+            fields = {key: value for key, value in result.items() if key != "type" and value}
+            if not result["name"] and name:  # the address alone: the venue's name is the one searched for
+                fields["name"] = name
+            initial = urlencode(fields | popup)
             venue = known.get(mbid or "") or known.get(osm_id or "")
             venue_url = ""
             if venue:
@@ -291,6 +311,8 @@ class VenueAdmin(admin.ModelAdmin):
                 "opts": self.model._meta,
                 "title": "Find a venue",
                 "name": name,
+                "address": address,
+                "postal_code": postal_code,
                 "city": city,
                 "rows": rows,
                 "popup": popup,
