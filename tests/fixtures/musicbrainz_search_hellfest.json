@@ -1,0 +1,23 @@
+{
+    "created": "2026-10-25T22:01:46.175Z",
+    "count": 2,
+    "offset": 0,
+    "series": [
+        {
+            "id": "728d4b81-b03d-4111-baf6-4d4c08c05798",
+            "type": "Festival",
+            "type-id": "44e9f6b1-34a7-3a17-a5d5-07bb100d8887",
+            "score": 100,
+            "name": "Hellfest",
+            "disambiguation": "France"
+        },
+        {
+            "id": "2c6b5d3e-88ae-4621-b629-9ffcad4c8514",
+            "type": "Festival",
+            "type-id": "44e9f6b1-34a7-3a17-a5d5-07bb100d8887",
+            "score": 100,
+            "name": "Hellfest",
+            "disambiguation": "USA"
+        }
+    ]
+}

@@ -1,0 +1,36 @@
+{% extends "admin/base_site.html" %}
+{% block breadcrumbs %}
+<div class="breadcrumbs">
+<a href="{% url 'admin:index' %}">Home</a> › <a href="{% url 'admin:concerts_festival_changelist' %}">Festivals</a> › Find a festival
+</div>
+{% endblock %}
+{% block content %}
+<form method="get">
+  <p>
+    <label>Name <input name="name" value="{{ name }}" autofocus></label>
+    {% for key, value in popup.items %}<input type="hidden" name="{{ key }}" value="{{ value }}">{% endfor %}
+    <button type="submit">Search</button>
+  </p>
+</form>
+<p class="help">The festival itself, not one year: "Hellfest", not "Hellfest 2027".</p>
+{% if name %}
+  {% if rows %}
+  <table>
+    <thead><tr><th>Name</th><th>Note</th><th>Found on</th><th></th></tr></thead>
+    <tbody>
+    {% for row in rows %}
+    <tr>
+      <td>{{ row.result.name }}</td>
+      <td>{{ row.result.disambiguation }}</td>
+      <td><a href="{{ row.musicbrainz_url }}" target="_blank" rel="noopener">MusicBrainz</a></td>
+      <td>{% if row.festival %}<a href="{{ row.festival_url }}">already added</a>{% else %}<a class="button" href="{{ row.use_url }}">Use this</a>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% elif not messages %}
+  <p>No festival found. Try a shorter name, or go back and fill in the form yourself.</p>
+  {% endif %}
+{% endif %}
+<p class="help">Data from <a href="https://musicbrainz.org" target="_blank" rel="noopener">MusicBrainz</a> (CC0); check the result before saving.</p>
+{% endblock %}

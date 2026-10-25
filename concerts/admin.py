@@ -17,7 +17,7 @@ from django.urls import URLPattern, path, reverse
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from . import musicbrainz, openstreetmap, public, venue_search
-from .models import Account, Band, BandLink, Concert, Membership, Venue, VenueLink
+from .models import Account, Band, BandLink, Concert, Festival, Membership, Venue, VenueLink
 
 # "View site" in the admin, and the guide link on its home page: the public pages
 admin.site.site_url = public.site_url() + "/"
@@ -66,6 +66,7 @@ class ConcertInline(admin.StackedInline):
                     ("starts_at", "time_tba"),
                     "ends_at",
                     "venue",
+                    "festival",
                     "status",
                     ("ticket_url", "entry"),
                     "support_acts",
@@ -75,7 +76,7 @@ class ConcertInline(admin.StackedInline):
         # Rarely needed: the previous date is set on its own, cleared by hand only to undo a typo
         ("More", {"fields": ["previous_starts_at", "announced_at"], "classes": ["collapse"]}),
     ]
-    autocomplete_fields = ["venue"]
+    autocomplete_fields = ["venue", "festival"]
 
 
 def member_bands(request: HttpRequest) -> QuerySet[Band]:
@@ -214,6 +215,13 @@ def popup_markers(request: HttpRequest) -> dict[str, str]:
     return {key: request.GET[key] for key in (IS_POPUP_VAR, TO_FIELD_VAR) if key in request.GET}
 
 
+def popup_pick(request: HttpRequest, obj: Venue | Festival) -> HttpResponse:
+    """In the small window opened from a concert: put a venue or festival already added into the concert, with
+    the same page Django shows after saving a new one there, which fills the field and closes the window."""
+    data = json.dumps({"value": str(obj.pk), "obj": str(obj)})
+    return TemplateResponse(request, "admin/popup_response.html", {"popup_response_data": data})
+
+
 @admin.register(Venue)
 class VenueAdmin(admin.ModelAdmin):
     list_display = ["name", "city", "postal_code"]
@@ -342,13 +350,98 @@ class VenueAdmin(admin.ModelAdmin):
         return redirect(reverse("admin:concerts_venue_add") + "?" + urlencode(initial))
 
     def pick(self, request: HttpRequest, venue_id: int) -> HttpResponse:
-        """In the small window opened from a concert: put a venue already added into the concert, with the
-        same page Django shows after saving a new one there, which fills the field and closes the window."""
         venue = get_object_or_404(Venue, pk=venue_id)
         if not self.has_view_permission(request, venue):
             raise PermissionDenied
-        data = json.dumps({"value": str(venue.pk), "obj": str(venue)})
-        return TemplateResponse(request, "admin/popup_response.html", {"popup_response_data": data})
+        return popup_pick(request, venue)
+
+
+@admin.register(Festival)
+class FestivalAdmin(admin.ModelAdmin):
+    list_display = ["name", "website"]
+    search_fields = ["name"]
+    add_form_template = "admin/concerts/festival/add_form.html"
+
+    def get_urls(self) -> list[URLPattern]:
+        return [
+            path("search/", self.admin_site.admin_view(self.find_festival), name="concerts_festival_search"),
+            path(
+                "musicbrainz/<uuid:mbid>/",
+                self.admin_site.admin_view(self.musicbrainz_prefill),
+                name="concerts_festival_musicbrainz_prefill",
+            ),
+            path("<int:festival_id>/pick/", self.admin_site.admin_view(self.pick), name="concerts_festival_pick"),
+        ] + super().get_urls()
+
+    def find_festival(self, request: HttpRequest) -> HttpResponse:
+        """Search MusicBrainz's festivals by name; nothing is saved here."""
+        if not self.has_add_permission(request):
+            raise PermissionDenied
+        name = request.GET.get("name", "").strip()
+        popup = popup_markers(request)
+        found: list[musicbrainz.FestivalFields] = []
+        if name:
+            try:
+                found = musicbrainz.search_festivals(name)
+            except musicbrainz.MusicBrainzError as error:
+                messages.warning(request, str(error))
+        known = {
+            str(festival.musicbrainz_id): festival
+            for festival in Festival.objects.filter(musicbrainz_id__in=[result["musicbrainz_id"] for result in found])
+        }
+        rows = []
+        for result in found:
+            mbid = result["musicbrainz_id"]
+            festival = known.get(mbid)
+            festival_url = ""
+            if festival:
+                festival_url = (
+                    reverse("admin:concerts_festival_pick", args=[festival.pk]) + "?" + urlencode(popup)
+                    if popup
+                    else reverse("admin:concerts_festival_change", args=[festival.pk])
+                )
+            rows.append(
+                {
+                    "result": result,
+                    "musicbrainz_url": f"https://musicbrainz.org/series/{mbid}",
+                    "festival": festival,
+                    "festival_url": festival_url,
+                    # The name travels along, so the form opens even if MusicBrainz does not answer for the website
+                    "use_url": reverse("admin:concerts_festival_musicbrainz_prefill", args=[mbid])
+                    + "?"
+                    + urlencode({"name": result["name"]} | popup),
+                }
+            )
+        return TemplateResponse(
+            request,
+            "admin/concerts/festival/search.html",
+            {
+                **self.admin_site.each_context(request),
+                "opts": self.model._meta,
+                "title": "Find a festival",
+                "name": name,
+                "rows": rows,
+                "popup": popup,
+                "is_popup": bool(popup),
+            },
+        )
+
+    def musicbrainz_prefill(self, request: HttpRequest, mbid: UUID) -> HttpResponse:
+        """ "Use this": fetch the festival's website, then open the "Add festival" form, pre-filled."""
+        if not self.has_add_permission(request):
+            raise PermissionDenied
+        initial: dict[str, Any] = dict(request.GET.items()) | {"musicbrainz_id": str(mbid)}
+        try:
+            initial["website"] = musicbrainz.festival_website(str(mbid))
+        except musicbrainz.MusicBrainzError as error:
+            messages.warning(request, f"{error} The website could not be fetched: add it if you know it.")
+        return redirect(reverse("admin:concerts_festival_add") + "?" + urlencode(initial))
+
+    def pick(self, request: HttpRequest, festival_id: int) -> HttpResponse:
+        festival = get_object_or_404(Festival, pk=festival_id)
+        if not self.has_view_permission(request, festival):
+            raise PermissionDenied
+        return popup_pick(request, festival)
 
 
 @admin.register(Concert)
@@ -357,7 +450,7 @@ class ConcertAdmin(admin.ModelAdmin):
     list_filter = ["status", ("band", admin.RelatedOnlyFieldListFilter), "venue__city"]
     search_fields = ["band__name", "venue__name", "venue__city", "support_acts"]
     date_hierarchy = "starts_at"
-    autocomplete_fields = ["band", "venue"]
+    autocomplete_fields = ["band", "venue", "festival"]
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Concert]:
         return super().get_queryset(request).filter(band__in=member_bands(request))
