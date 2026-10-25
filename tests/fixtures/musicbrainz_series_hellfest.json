@@ -1,0 +1,117 @@
+{
+    "name": "Hellfest",
+    "disambiguation": "France",
+    "type": "Festival",
+    "id": "728d4b81-b03d-4111-baf6-4d4c08c05798",
+    "type-id": "44e9f6b1-34a7-3a17-a5d5-07bb100d8887",
+    "relations": [
+        {
+            "type": "official homepage",
+            "source-credit": "",
+            "target-credit": "",
+            "attribute-ids": {},
+            "target-type": "url",
+            "begin": null,
+            "direction": "forward",
+            "type-id": "b79eb9a5-46df-492d-b107-1f1fea71b0eb",
+            "end": null,
+            "ended": false,
+            "attribute-values": {},
+            "url": {
+                "resource": "https://www.hellfest.fr/",
+                "id": "7de5cd35-08c3-46ea-b4c6-4ef32d1cdd85"
+            },
+            "attributes": []
+        },
+        {
+            "ended": false,
+            "end": null,
+            "type-id": "80d5e037-9aa7-3d80-80da-fb01d6dbc25b",
+            "direction": "forward",
+            "attribute-values": {},
+            "source-credit": "",
+            "type": "social network",
+            "target-credit": "",
+            "attribute-ids": {},
+            "begin": null,
+            "target-type": "url",
+            "url": {
+                "id": "f1bcb86d-29c5-4ea9-9295-2709fe7a56b6",
+                "resource": "https://twitter.com/hellfestopenair"
+            },
+            "attributes": []
+        },
+        {
+            "url": {
+                "id": "d1755082-0048-4f1b-a624-439539a09c08",
+                "resource": "https://www.facebook.com/hellfest"
+            },
+            "attributes": [],
+            "ended": false,
+            "direction": "forward",
+            "type-id": "80d5e037-9aa7-3d80-80da-fb01d6dbc25b",
+            "end": null,
+            "attribute-values": {},
+            "target-credit": "",
+            "type": "social network",
+            "source-credit": "",
+            "target-type": "url",
+            "begin": null,
+            "attribute-ids": {}
+        },
+        {
+            "url": {
+                "resource": "https://www.instagram.com/hellfestopenair/",
+                "id": "078a1fa0-0f06-4231-83f5-fae88847c504"
+            },
+            "attributes": [],
+            "type": "social network",
+            "source-credit": "",
+            "target-credit": "",
+            "attribute-ids": {},
+            "begin": null,
+            "target-type": "url",
+            "direction": "forward",
+            "type-id": "80d5e037-9aa7-3d80-80da-fb01d6dbc25b",
+            "end": null,
+            "ended": false,
+            "attribute-values": {}
+        },
+        {
+            "url": {
+                "id": "aa43b7af-367d-4518-ae36-e5aa2a2b235d",
+                "resource": "https://www.wikidata.org/wiki/Q247500"
+            },
+            "attributes": [],
+            "type": "wikidata",
+            "source-credit": "",
+            "target-credit": "",
+            "attribute-ids": {},
+            "target-type": "url",
+            "begin": null,
+            "ended": false,
+            "type-id": "a1eecd98-f2f2-420b-ba8e-e5bc61697869",
+            "direction": "forward",
+            "end": null,
+            "attribute-values": {}
+        },
+        {
+            "type": "youtube",
+            "source-credit": "",
+            "target-credit": "",
+            "attribute-ids": {},
+            "begin": null,
+            "target-type": "url",
+            "ended": false,
+            "type-id": "f23802a4-36be-3751-8e4d-93422e08b3e8",
+            "direction": "forward",
+            "end": null,
+            "attribute-values": {},
+            "url": {
+                "resource": "https://www.youtube.com/user/OfficialHellfest",
+                "id": "0cd7632f-4007-4d56-8359-de0e0fe76fad"
+            },
+            "attributes": []
+        }
+    ]
+}

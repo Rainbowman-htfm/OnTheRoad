@@ -1,4 +1,5 @@
-"""Read venues ("places") from MusicBrainz. Data under CC0; read only, never write."""
+"""Read venues ("places") and festivals ("series" of type Festival) from MusicBrainz. Data under CC0; read only,
+never write."""
 
 import re
 import threading
@@ -40,6 +41,14 @@ class VenueFields(TypedDict):
 
 class PlaceFields(VenueFields):
     website: str
+
+
+class FestivalFields(TypedDict):
+    """A festival across the years; MusicBrainz lists each year's edition as an event of the series."""
+
+    musicbrainz_id: str
+    name: str
+    disambiguation: str  # what tells two festivals of the same name apart: "France", "USA"
 
 
 def user_agent() -> str:
@@ -117,10 +126,9 @@ def search_places(name: str, city: str, client: httpx.Client | None = None) -> l
     return [_venue_fields(place) for place in data["places"]]
 
 
-def place(mbid: str, client: httpx.Client | None = None) -> PlaceFields:
-    """One place with its official website, if MusicBrainz knows it."""
-    data = _fetch(client, f"place/{mbid}", {"inc": "url-rels"})
-    website = next(
+def _official_website(data: dict[str, Any]) -> str:
+    """The current official homepage among an entity's links (fetched with inc=url-rels), or ""."""
+    return next(
         (
             relation["url"]["resource"]
             for relation in data.get("relations", [])
@@ -128,4 +136,22 @@ def place(mbid: str, client: httpx.Client | None = None) -> PlaceFields:
         ),
         "",
     )
-    return {**_venue_fields(data), "website": website}
+
+
+def place(mbid: str, client: httpx.Client | None = None) -> PlaceFields:
+    """One place with its official website, if MusicBrainz knows it."""
+    data = _fetch(client, f"place/{mbid}", {"inc": "url-rels"})
+    return {**_venue_fields(data), "website": _official_website(data)}
+
+
+def search_festivals(name: str, client: httpx.Client | None = None) -> list[FestivalFields]:
+    data = _fetch(client, "series/", {"query": f"series:{_quoted(name)} AND type:festival", "limit": 10})
+    return [
+        {"musicbrainz_id": series["id"], "name": series["name"], "disambiguation": series.get("disambiguation", "")}
+        for series in data["series"]
+    ]
+
+
+def festival_website(mbid: str, client: httpx.Client | None = None) -> str:
+    """A festival's official website: its search results have none."""
+    return _official_website(_fetch(client, f"series/{mbid}", {"inc": "url-rels"}))
