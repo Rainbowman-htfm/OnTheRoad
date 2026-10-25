@@ -49,6 +49,7 @@ footer { margin-top: 2rem; font-size: .9em; }
 {% else %}
 <p>No bands yet.</p>
 {% endif %}
+{% if suggest %}<p>A band you like isn't here? <a href="{{ suggest }}">Tell us</a>, or help keep its dates up to date.</p>{% endif %}
 
 <h2>Follow a band in one tap</h2>
 <p>Tap "Add to my calendar" on a band's page and their upcoming shows will appear in your phone's calendar — and stay up to date when dates change.</p>

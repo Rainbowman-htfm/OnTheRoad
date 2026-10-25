@@ -115,7 +115,7 @@ def test_public_pages_credit_openstreetmap_only_when_needed(settings, tmp_path):
     for name in ("index.html", "widget/index.html"):
         assert "Some venue data © " in (tmp_path / "damantra" / name).read_text(), name
     Venue.objects.filter(pk=venue.pk).update(osm_id="node/1")
-    assert ">Venue data © " in public.band_page(band, list(public.upcoming_concerts(band)), [])
+    assert ">Venue data © " in public.band_page(band, list(public.upcoming_concerts(band)), [], False)
     public.build_home()  # "Next show" shows a venue from OpenStreetMap
     assert "OpenStreetMap contributors" in (tmp_path / "index.html").read_text()
 

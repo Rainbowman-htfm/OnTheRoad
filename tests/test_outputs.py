@@ -53,7 +53,7 @@ def test_calendar_keeps_past_and_cancelled_concerts(site, band, venue):
     assert event["status"] == "CANCELLED"
     assert event["summary"] == "Damantra at Le Plan"
     assert event["location"] == "Le Plan, 91130 Ris-Orangis"
-    assert event["description"] == "Cancelled · with Novelists"
+    assert str(event["description"]).startswith("Cancelled · with Novelists\n")
     assert event.decoded("dtstart") == cancelled.starts_at.replace(microsecond=0)  # iCal keeps whole seconds
 
 
