@@ -7,7 +7,7 @@ import shutil
 import zlib
 from datetime import datetime, time, timedelta
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import quote, urlencode, urlparse
 
 from django.conf import settings
 from django.db.models import QuerySet
@@ -17,7 +17,7 @@ from django.utils.feedgenerator import Rss201rev2Feed
 from django.utils.safestring import SafeString, mark_safe
 from icalendar import Calendar, Event
 
-from .models import Band, Concert
+from .models import Band, Concert, Membership
 
 EVENT_STATUS: dict[str, str] = {
     Concert.Status.PLANNED: "EventScheduled",
@@ -90,6 +90,39 @@ def monogram(band: Band) -> dict[str, Any]:
     words = band.name.split() or ["?"]
     initials = words[0][0] + (words[-1][0] if len(words) > 1 else "")
     return {"initials": initials.upper(), "hue": zlib.crc32(band.slug.encode()) % 360}
+
+
+# A band with no member account has its dates entered by the site, from its public announcements
+UNCLAIMED_NOTE = "Listed by On the Road from the band's announcements, not by the band."
+
+
+def claimed_band_ids() -> set[int]:
+    """Bands with at least one member account: they manage their own page."""
+    return set(Membership.objects.values_list("band_id", flat=True))
+
+
+def mailto(subject: str, body: str) -> str:
+    """Link opening an email to the site's contact, already filled in; "" without a contact address."""
+    if not settings.CONTACT_EMAIL:
+        return ""
+    # quote rather than the default "+" for spaces, which mail apps would show as is
+    return f"mailto:{settings.CONTACT_EMAIL}?" + urlencode({"subject": subject, "body": body}, quote_via=quote)
+
+
+def unclaimed_links(band: Band) -> dict[str, str]:
+    """Email links of an unclaimed band's page: claim it, help with it, or have it removed."""
+    page = page_url(band)
+    return {
+        "claim": mailto(
+            f"Claim {band.name}",
+            f"I'm in {band.name} and would like to manage its page: {page}\n\n"
+            "My role in the band:\nA link showing it (the band's official account or website):\n",
+        ),
+        "help": mailto(
+            f"Help with {band.name}", f"I'd like to help keep the dates of {band.name} up to date: {page}\n"
+        ),
+        "remove": mailto(f"Remove {band.name}", f"Please remove the page of {band.name}: {page}\n"),
+    }
 
 
 def concert_uid(concert: Concert) -> str:
@@ -194,7 +227,7 @@ def json_for_script(data: Any) -> SafeString:
     return mark_safe(json.dumps(data, ensure_ascii=False).replace("<", "\\u003c"))
 
 
-def band_page(band: Band, concerts: list[Concert], band_links: list[str]) -> str:
+def band_page(band: Band, concerts: list[Concert], band_links: list[str], claimed: bool) -> str:
     links = ([band.website] if band.website else []) + band_links
     return render_to_string(
         "concerts/band_page.html",
@@ -207,6 +240,8 @@ def band_page(band: Band, concerts: list[Concert], band_links: list[str]) -> str
             "style": band_style(band),
             "new_since": new_since(),
             "osm_credit": osm_credit(concerts),
+            "claimed": claimed,
+            "unclaimed_links": {} if claimed else unclaimed_links(band),
         },
     )
 
@@ -257,7 +292,13 @@ def describe(concert: Concert) -> str:
     return " · ".join(parts)
 
 
-def calendar(band: Band) -> bytes:
+def feed_text(concert: Concert, claimed: bool) -> str:
+    """Text of a concert in the feeds: its details, and where the date comes from when the band does not
+    manage its page, so followers can judge it."""
+    return "\n".join(part for part in (describe(concert), "" if claimed else UNCLAIMED_NOTE) if part)
+
+
+def calendar(band: Band, claimed: bool) -> bytes:
     """iCal feed. Past concerts stay in it: a subscribed calendar drops whatever leaves the feed."""
     # ponytail: every past concert, so the file grows ~400 bytes per concert and calendars re-download it
     # every few hours; keep only the last 12 months or so once bands have hundreds of concerts
@@ -286,15 +327,15 @@ def calendar(band: Band) -> bytes:
         event.add("status", ICAL_STATUS[concert.status])
         if concert.ticket_url:
             event.add("url", concert.ticket_url)
-        if description := describe(concert):
+        if description := feed_text(concert, claimed):
             event.add("description", description)
         cal.add_component(event)
     return cal.to_ical()
 
 
-def rss(concerts: list[Concert], band: Band | None = None) -> str:
+def rss(concerts: list[Concert], claimed: set[int], band: Band | None = None) -> str:
     """RSS feed of upcoming concerts, latest announcements first: one band's, or the whole site's
-    recent announcements (band=None), whose items start with the band's name."""
+    recent announcements (band=None), whose items start with the band's name. claimed: claimed_band_ids()."""
     if band:
         feed = Rss201rev2Feed(
             title=f"{band.name} – upcoming concerts",
@@ -316,7 +357,7 @@ def rss(concerts: list[Concert], band: Band | None = None) -> str:
         feed.add_item(
             title=title if band else f"{concert.band.name}: {title}",
             link=concert.ticket_url or page_url(concert.band),
-            description=details,
+            description=feed_text(concert, concert.band_id in claimed),
             unique_id=concert_uid(concert),
             unique_id_is_permalink=False,
             pubdate=concert.announced_at,
@@ -328,15 +369,16 @@ def build_band(band: Band) -> None:
     concerts = list(upcoming_concerts(band))
     # The band's links are loaded once, not once per concert
     band_links = [link.url for link in band.links.all()]
+    claimed = band.members.exists()
     events = [music_event(concert, band_links) for concert in concerts]
     folder = settings.PUBLIC_DIR / band.slug
     (folder / "widget").mkdir(parents=True, exist_ok=True)
-    (folder / "index.html").write_text(band_page(band, concerts, band_links), encoding="utf-8")
+    (folder / "index.html").write_text(band_page(band, concerts, band_links, claimed), encoding="utf-8")
     (folder / "widget" / "index.html").write_text(widget_page(band, concerts), encoding="utf-8")
     # Same MusicEvent data as the page, for the band's own website (embed code)
     (folder / "events.json").write_text(json_for_script(events), encoding="utf-8")
-    (folder / "concerts.ics").write_bytes(calendar(band))
-    (folder / "concerts.xml").write_text(rss(concerts, band), encoding="utf-8")
+    (folder / "concerts.ics").write_bytes(calendar(band, claimed))
+    (folder / "concerts.xml").write_text(rss(concerts, {band.pk} if claimed else set(), band), encoding="utf-8")
 
 
 def remove_band(slug: str) -> None:
@@ -382,10 +424,15 @@ def build_home() -> None:
             "osm_credit": osm_credit(shown),
             "contact": settings.CONTACT_EMAIL,
             "source": settings.SOURCE_URL,
+            "suggest": mailto(
+                "Suggest a band",
+                "Band:\nCity:\nOfficial link (website, Instagram…):\n\n"
+                "Would you like to help keep its dates up to date? yes / no\n",
+            ),
         },
     )
     (settings.PUBLIC_DIR / "index.html").write_text(html, encoding="utf-8")
-    (settings.PUBLIC_DIR / "just-announced.xml").write_text(rss(announced), encoding="utf-8")
+    (settings.PUBLIC_DIR / "just-announced.xml").write_text(rss(announced, claimed_band_ids()), encoding="utf-8")
     # A file, not a folder: no clash with a band called "data", and the nightly cleanup of folders leaves it
     data_page = render_to_string(
         "concerts/data.html", {"contact": settings.CONTACT_EMAIL, "source": settings.SOURCE_URL}

@@ -4,7 +4,7 @@
   <time class="tile" datetime="{% if concert.time_tba %}{{ concert.starts_at|date:'Y-m-d' }}{% else %}{{ concert.starts_at|date:'c' }}{% endif %}"><span class="d">{{ concert.starts_at|date:"j" }}</span><span class="m">{{ concert.starts_at|date:"M" }}</span></time>
   <div class="info">
     <strong class="venue">{% include "concerts/_venue.html" %}{% if new_since and concert.announced_at >= new_since and concert.status != "cancelled" %} <span class="new">New</span>{% endif %}{% if concert.previous_starts_at %} <span class="moved">Rescheduled · was {{ concert.previous_starts_at|date:"M j" }}</span>{% endif %}</strong>
-    <span class="details"><span>{{ concert.venue.city }}</span><span class="time">{% if concert.time_tba %}{{ concert.starts_at|date:"D" }}, time TBA{% else %}{{ concert.starts_at|date:"D H:i" }}{% endif %}</span><span>{% if concert.support_acts %}with {{ concert.support_acts }}{% endif %}</span><span class="km"></span></span>
+    <span class="details"><span>{{ concert.venue.city }}</span><span class="time">{% if concert.time_tba %}{{ concert.starts_at|date:"D" }}, time TBA{% else %}{{ concert.starts_at|date:"D H:i" }}{% endif %}</span><span>{% if concert.support_acts %}with {{ concert.support_acts }}{% endif %}</span><span>{% if concert.source_url and not concert.ticket_url %}<a href="{{ concert.source_url }}"{% if new_tab %} target="_blank"{% endif %} rel="noopener">Source</a>{% endif %}</span><span class="km"></span></span>
   </div>
   <div class="action">
     {% if concert.status == "cancelled" %}<span class="status-cancelled">Cancelled</span>

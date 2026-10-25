@@ -192,6 +192,12 @@ class Concert(models.Model):
     ticket_url = models.URLField("ticket link", blank=True)
     free_entry = models.BooleanField(default=False)
     support_acts = models.CharField(max_length=300, blank=True)
+    # Where a date entered by On the Road was announced; a ticket link shows it already, and a band is its own source
+    source_url = models.URLField(
+        "source",
+        blank=True,
+        help_text="Where the date was announced, when there is no ticket link: the band's post, the venue's page.",
+    )
     announced_at = models.DateTimeField(
         default=timezone.now,
         help_text="Shown as new for 14 days. Set an earlier date for a concert already announced elsewhere.",

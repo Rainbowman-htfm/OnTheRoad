@@ -73,7 +73,7 @@ class ConcertInline(admin.StackedInline):
             },
         ),
         # Rarely needed: the previous date is set on its own, cleared by hand only to undo a typo
-        ("More", {"fields": ["previous_starts_at", "announced_at"], "classes": ["collapse"]}),
+        ("More", {"fields": ["previous_starts_at", "announced_at", "source_url"], "classes": ["collapse"]}),
     ]
     autocomplete_fields = ["venue"]
 
@@ -178,7 +178,9 @@ class BandAdmin(admin.ModelAdmin):
         form = StyleForm(request.GET, instance=band)
         form.is_valid()  # copies the valid values onto this unsaved band; invalid ones keep the saved style
         concerts = list(public.upcoming_concerts(band))
-        return HttpResponse(public.band_page(band, concerts, [link.url for link in band.links.all()]))
+        return HttpResponse(
+            public.band_page(band, concerts, [link.url for link in band.links.all()], band.members.exists())
+        )
 
     def share(self, request: HttpRequest, band_id: int) -> HttpResponse:
         """Links, widget settings with a live preview, and the code to paste on the band's website."""

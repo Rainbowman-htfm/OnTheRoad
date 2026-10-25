@@ -8,7 +8,7 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from . import public
-from .models import Band, BandLink, Concert, Venue
+from .models import Band, BandLink, Concert, Membership, Venue
 
 
 def rebuild(band_ids: Iterable[int]) -> None:
@@ -34,7 +34,11 @@ def band_deleted(sender: type[Band], instance: Band, **kwargs: Any) -> None:
 
 @receiver([post_save, post_delete], sender=Concert)
 @receiver([post_save, post_delete], sender=BandLink)
-def band_part_changed(sender: type[Concert | BandLink], instance: Concert | BandLink, **kwargs: Any) -> None:
+# A first member claims the page: the "maintained by On the Road" notice goes
+@receiver([post_save, post_delete], sender=Membership)
+def band_part_changed(
+    sender: type[Concert | BandLink | Membership], instance: Concert | BandLink | Membership, **kwargs: Any
+) -> None:
     rebuild([instance.band_id])
 
 

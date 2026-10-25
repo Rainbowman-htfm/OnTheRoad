@@ -11,6 +11,7 @@
 body { max-width: 54rem; margin: 0 auto; padding: 1rem; }
 h1 { margin: 0; }
 footer { opacity: .7; }
+.unclaimed { font-size: .9em; opacity: .8; }
 </style>
 {% for event in events %}
 <script type="application/ld+json">{{ event }}</script>
@@ -18,6 +19,7 @@ footer { opacity: .7; }
 </head>
 <body>
 <h1>{{ band.name }}</h1>
+{% if not claimed %}<p class="unclaimed">This page is maintained by On the Road, not by the band.{% if unclaimed_links.claim %} Are you in this band? <a href="{{ unclaimed_links.claim }}">Claim this page</a>.{% endif %}</p>{% endif %}
 <p class="muted">Upcoming concerts · Subscribe: <a href="{{ calendar_url }}">calendar</a> · <a href="concerts.xml">RSS</a></p>
 {% if concerts %}
 <p><button class="near" id="near" type="button" hidden>📍 Near me</button> <span id="near-message" class="muted"></span></p>
@@ -26,9 +28,10 @@ footer { opacity: .7; }
 <p>No upcoming concerts.</p>
 {% endif %}
 {% if links %}
-<footer><p>{% for url, label in links %}<a href="{{ url }}" rel="me noopener">{{ label }}</a>{% if not forloop.last %} · {% endif %}{% endfor %}</p></footer>
+<footer><p>{% for url, label in links %}<a href="{{ url }}" rel="{% if claimed %}me {% endif %}noopener">{{ label }}</a>{% if not forloop.last %} · {% endif %}{% endfor %}</p></footer>
 {% endif %}
 {% include "concerts/_osm_credit.html" %}
+{% if unclaimed_links.help %}<p class="credit"><a href="{{ unclaimed_links.help }}">Help keep these dates up to date</a> · <a href="{{ unclaimed_links.remove }}">Remove this page</a></p>{% endif %}
 <p class="credit"><a href="../data.html">Your data</a> · <a href="../">On the Road</a></p>
 {% include "concerts/_near_me.html" %}
 </body>

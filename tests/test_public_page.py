@@ -35,7 +35,7 @@ def add_concert(band, venue, days, **fields):
 
 def page(band):
     concerts = list(public.upcoming_concerts(band))
-    return public.band_page(band, concerts, [link.url for link in band.links.all()])
+    return public.band_page(band, concerts, [link.url for link in band.links.all()], False)
 
 
 def json_ld_blocks(html):
@@ -96,8 +96,8 @@ def test_venue_name_links_to_its_website(band, venue, public_dir):
 def test_query_count_does_not_grow_with_concerts(band, venue, django_assert_num_queries):
     for days in range(1, 6):
         add_concert(band, venue, days=days)
-    # The upcoming concerts with their venues, the band's links, then every concert for the calendar
-    with django_assert_num_queries(3):
+    # The upcoming concerts with their venues, the band's links, whether it has members, every concert for the calendar
+    with django_assert_num_queries(4):
         public.build_band(band)
 
 
