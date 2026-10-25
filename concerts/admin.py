@@ -78,6 +78,10 @@ class ConcertInline(admin.StackedInline):
     ]
     autocomplete_fields = ["venue", "festival"]
 
+    def get_queryset(self, request: HttpRequest) -> QuerySet[Concert]:
+        # Upcoming concerts only, so the page stays short; past ones are in the list of concerts
+        return super().get_queryset(request).filter(starts_at__gte=public.start_of_today())
+
 
 def member_bands(request: HttpRequest) -> QuerySet[Band]:
     """The bands this account may manage: all of them for a superuser, otherwise the ones it is a member of."""
@@ -460,3 +464,13 @@ class ConcertAdmin(admin.ModelAdmin):
         if db_field.name == "band":
             kwargs["queryset"] = member_bands(request)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def response_add(self, request: HttpRequest, obj: Concert, post_url_continue: str | None = None) -> HttpResponse:
+        response = super().response_add(request, obj, post_url_continue)
+        # Opened with "Add a concert" from a band's page (?band=): back to that page after saving, or, with
+        # "Save and add another", a new form for the same band
+        if "band" not in request.GET or "_continue" in request.POST or IS_POPUP_VAR in request.POST:
+            return response
+        if "_addanother" in request.POST:
+            return redirect(request.get_full_path())
+        return redirect("admin:concerts_band_change", obj.band_id)

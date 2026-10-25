@@ -1,5 +1,5 @@
 {% extends "admin/change_form.html" %}
 {% block object-tools-items %}
-{% if original %}<li><a href="{% url 'admin:concerts_band_style' original.pk %}">Page style</a></li><li><a href="{% url 'admin:concerts_band_share' original.pk %}">Share</a></li>{% endif %}
+{% if original %}<li><a href="{% url 'admin:concerts_concert_add' %}?band={{ original.pk }}">Add a concert</a></li><li><a href="{% url 'admin:concerts_band_style' original.pk %}">Page style</a></li><li><a href="{% url 'admin:concerts_band_share' original.pk %}">Share</a></li>{% endif %}
 {{ block.super }}
 {% endblock %}
