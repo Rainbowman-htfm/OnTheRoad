@@ -209,15 +209,26 @@ def test_style_pages_require_admin(client, band):
 
 
 def test_free_entry_shown_when_there_is_no_ticket_link(site, band, venue):
-    free = add_concert(band, venue, days=3, free_entry=True)
+    free = add_concert(band, venue, days=3, entry=Concert.Entry.FREE)
     page = built(site, band, "index.html")
     assert "Free entry" in page and "Tickets" not in page
     assert public.music_event(free, [])["isAccessibleForFree"] is True
     assert "Free entry" in built(site, band, "concerts.ics")
-    # With a link (a free booking), the link is shown; "free" stays in the data and feeds
-    free.ticket_url = "https://tickets.example/1"
+    # A link is the event's page, beside "Free entry": no ticket button, nothing to buy in the data
+    free.ticket_url = "https://venue.example/event"
     free.save()
-    assert "Tickets" in built(site, band, "index.html")
+    page = built(site, band, "index.html")
+    assert 'Free entry<a href="https://venue.example/event" rel="noopener">Details</a>' in page
+    assert "Tickets" not in page
+    assert public.music_event(free, [])["url"] == "https://venue.example/event"
+    assert "offers" not in public.music_event(free, [])
+
+
+def test_pay_what_you_can(site, band, venue):
+    concert = add_concert(band, venue, days=3, entry=Concert.Entry.PAY_WHAT_YOU_CAN)
+    assert "Pay what you can" in built(site, band, "index.html")
+    assert "Pay what you can" in built(site, band, "concerts.xml")
+    assert "isAccessibleForFree" not in public.music_event(concert, [])
 
 
 def test_rescheduled_concert_shows_its_previous_date(site, band, venue):

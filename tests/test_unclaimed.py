@@ -72,21 +72,6 @@ def test_feeds_say_who_listed_the_dates(site, venue):
     assert notes == {"Damantra": True, "Splenius": False}
 
 
-def test_source_link_only_when_filled_in_and_no_ticket_link(site, venue):
-    band = band_with_a_concert("Damantra", venue, claimed=False)
-    public.build_band(band)
-    assert ">Source</a>" not in (site / "damantra" / "index.html").read_text()
-    band.concerts.update(source_url="https://www.instagram.com/p/abc")
-    public.build_band(band)
-    assert (
-        '<a href="https://www.instagram.com/p/abc" rel="noopener">Source</a>'
-        in (site / "damantra" / "index.html").read_text()
-    )
-    band.concerts.update(ticket_url="https://tickets.example/1")  # the ticket page shows it already
-    public.build_band(band)
-    assert ">Source</a>" not in (site / "damantra" / "index.html").read_text()
-
-
 def test_claiming_rebuilds_the_page(site, venue, django_capture_on_commit_callbacks):
     with django_capture_on_commit_callbacks(execute=True):
         band = band_with_a_concert("Damantra", venue, claimed=False)

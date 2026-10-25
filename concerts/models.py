@@ -174,6 +174,12 @@ class Concert(models.Model):
         CANCELLED = "cancelled"
         SOLD_OUT = "sold_out", "sold out"
 
+    # One choice rather than two boxes ("free", "pay what you can") that could both be ticked
+    class Entry(models.TextChoices):
+        TICKETS = "tickets"
+        FREE = "free", "free entry"
+        PAY_WHAT_YOU_CAN = "pay_what_you_can", "pay what you can"
+
     # Deleting a band deletes its concerts; a venue that still has concerts cannot be deleted
     band = models.ForeignKey(Band, on_delete=models.CASCADE, related_name="concerts")
     venue = models.ForeignKey(Venue, on_delete=models.PROTECT, related_name="concerts")
@@ -189,15 +195,12 @@ class Concert(models.Model):
     # The day is known but not the time: outputs show the date only, never the time in starts_at
     time_tba = models.BooleanField("time not announced yet", default=False)
     status = models.CharField(max_length=10, choices=Status.choices, default=Status.PLANNED)
-    ticket_url = models.URLField("ticket link", blank=True)
-    free_entry = models.BooleanField(default=False)
-    support_acts = models.CharField(max_length=300, blank=True)
-    # Where a date entered by On the Road was announced; a ticket link shows it already, and a band is its own source
-    source_url = models.URLField(
-        "source",
-        blank=True,
-        help_text="Where the date was announced, when there is no ticket link: the band's post, the venue's page.",
+    # The ticket page, or for a free or pay-what-you-can concert the event's page or announcement
+    ticket_url = models.URLField(
+        "link", blank=True, help_text="Tickets: the ticket page. Otherwise the event's page or announcement."
     )
+    entry = models.CharField(max_length=20, choices=Entry.choices, default=Entry.TICKETS)
+    support_acts = models.CharField(max_length=300, blank=True)
     announced_at = models.DateTimeField(
         default=timezone.now,
         help_text="Shown as new for 14 days. Set an earlier date for a concert already announced elsewhere.",
