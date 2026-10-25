@@ -67,13 +67,13 @@ class ConcertInline(admin.StackedInline):
                     "ends_at",
                     "venue",
                     "status",
-                    ("ticket_url", "free_entry"),
+                    ("ticket_url", "entry"),
                     "support_acts",
                 ]
             },
         ),
         # Rarely needed: the previous date is set on its own, cleared by hand only to undo a typo
-        ("More", {"fields": ["previous_starts_at", "announced_at", "source_url"], "classes": ["collapse"]}),
+        ("More", {"fields": ["previous_starts_at", "announced_at"], "classes": ["collapse"]}),
     ]
     autocomplete_fields = ["venue"]
 

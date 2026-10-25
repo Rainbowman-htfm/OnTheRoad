@@ -208,11 +208,13 @@ def music_event(concert: Concert, same_as: list[str]) -> dict[str, Any]:
         "eventAttendanceMode": "https://schema.org/OfflineEventAttendanceMode",
         "location": location,
         "performer": performer,
-        **({"isAccessibleForFree": True} if concert.free_entry else {}),
+        **({"isAccessibleForFree": True} if concert.entry == Concert.Entry.FREE else {}),
     }
     if concert.previous_starts_at:
         event["previousStartDate"] = timezone.localdate(concert.previous_starts_at).isoformat()
-    if concert.ticket_url:
+    if concert.ticket_url and concert.entry != Concert.Entry.TICKETS:
+        event["url"] = concert.ticket_url  # the event's page: nothing to buy
+    elif concert.ticket_url:
         sold_out = concert.status == Concert.Status.SOLD_OUT
         event["offers"] = {
             "@type": "Offer",
@@ -280,13 +282,13 @@ def widget_page(band: Band, concerts: list[Concert]) -> str:
 
 
 def describe(concert: Concert) -> str:
-    """Extra information for feeds: status if not planned, previous date, free entry and support acts."""
+    """Extra information for feeds: status if not planned, previous date, free or pay what you can, support acts."""
     parts = [] if concert.status == Concert.Status.PLANNED else [Concert.Status(concert.status).label.capitalize()]
     if concert.previous_starts_at:
         was = dateformat.format(timezone.localtime(concert.previous_starts_at), "M j")
         parts.append(f"Rescheduled (was {was})")
-    if concert.free_entry:
-        parts.append("Free entry")
+    if concert.entry != Concert.Entry.TICKETS:
+        parts.append(Concert.Entry(concert.entry).label.capitalize())
     if concert.support_acts:
         parts.append(f"with {concert.support_acts}")
     return " · ".join(parts)

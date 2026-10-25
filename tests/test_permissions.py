@@ -41,6 +41,7 @@ def add_concert(client, band, venue):
             "starts_at_0": "2030-05-01",
             "starts_at_1": "20:30",
             "status": "planned",
+            "entry": "tickets",
             "announced_at_0": "2030-01-01",
             "announced_at_1": "12:00",
         },
