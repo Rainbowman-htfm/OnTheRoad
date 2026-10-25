@@ -55,10 +55,22 @@ def test_same_venue_on_both_is_one_result():
     assert len(merged) == len(mb)  # the OpenStreetMap result was not listed a second time
 
 
-def test_same_name_far_apart_or_in_another_city_is_another_venue():
+def test_merged_venue_takes_the_coordinates_from_the_map():
+    town = {"name": "Big Band Café", "city": "Hérouville-Saint-Clair"}
+    mb = [{**town, "musicbrainz_id": "1", "latitude": "49.194479", "longitude": "-0.34033"}]
+    osm = [{**town, "osm_id": "way/1", "latitude": "49.210809", "longitude": "-0.334083"}]
+    [merged] = venue_search.merge(mb, osm)
+    assert (merged["musicbrainz_id"], merged["osm_id"]) == ("1", "way/1")
+    assert (merged["latitude"], merged["longitude"]) == ("49.210809", "-0.334083")
+
+
+def test_same_name_far_apart_in_another_city_is_another_venue():
     here = {"name": "Le Plan", "city": "Ris-Orangis", "latitude": "48.65", "longitude": "2.41"}
     assert venue_search.same_venue(here, {**here, "name": "LE PLAN"})
-    assert not venue_search.same_venue(here, {**here, "latitude": "48.66"})  # about 1 km north
+    assert venue_search.same_venue(here, {**here, "city": "Ris Orangis Cedex", "latitude": "48.6505"})  # 60 m
+    # The Big Band Café: MusicBrainz's coordinates are 1.8 km off, the city tells it is the same venue
+    assert venue_search.same_venue(here, {**here, "latitude": "48.666"})
+    assert not venue_search.same_venue(here, {**here, "city": "Évry", "latitude": "48.666"})
     no_coordinates = {"name": "Le Plan", "city": "Ris-Orangis", "latitude": "", "longitude": ""}
     assert venue_search.same_venue(no_coordinates, {**no_coordinates, "city": "ris orangis"})
     assert not venue_search.same_venue(no_coordinates, {**no_coordinates, "city": "Paris"})

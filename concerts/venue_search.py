@@ -27,21 +27,26 @@ def distance_metres(a: Mapping[str, Any], b: Mapping[str, Any]) -> float | None:
 
 
 def same_venue(a: Mapping[str, Any], b: Mapping[str, Any]) -> bool:
-    """Same name, and close together; without coordinates, in the same city."""
+    """Same name, and in the same city or close together (a city written differently). Coordinates alone
+    are not enough to tell two venues apart: MusicBrainz's are typed by hand, sometimes a few km off."""
     if normalize(a["name"]) != normalize(b["name"]):
         return False
     distance = distance_metres(a, b)
-    return distance <= SAME_PLACE_METRES if distance is not None else normalize(a["city"]) == normalize(b["city"])
+    return normalize(a["city"]) == normalize(b["city"]) or (distance is not None and distance <= SAME_PLACE_METRES)
 
 
 def merge(musicbrainz: Sequence[Mapping[str, Any]], openstreetmap: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:
     """MusicBrainz results first, each joined by the same venue from OpenStreetMap if there is one: MusicBrainz's
-    values win and OpenStreetMap fills what they lack (often the website). Then the other OpenStreetMap results."""
+    values win and OpenStreetMap fills what they lack (often the website), except the coordinates, placed on
+    the map in OpenStreetMap. Then the other OpenStreetMap results."""
     remaining = list(openstreetmap)
     results = []
     for place in musicbrainz:
         match = next((result for result in remaining if same_venue(place, result)), None)
         if match:
             remaining.remove(match)
-        results.append({**(match or {}), **{key: value for key, value in place.items() if value}})
+        merged = {**(match or {}), **{key: value for key, value in place.items() if value}}
+        if match and match.get("latitude"):
+            merged["latitude"], merged["longitude"] = match["latitude"], match["longitude"]
+        results.append(merged)
     return results + [dict(result) for result in remaining]
