@@ -27,7 +27,9 @@ def band():
 
 @pytest.fixture
 def venue():
-    return Venue.objects.create(name="Le Plan", city="Ris-Orangis", latitude="48.651300", longitude="2.416500")
+    return Venue.objects.create(
+        name="Le Plan", city="Ris-Orangis", country="FR", latitude="48.651300", longitude="2.416500"
+    )
 
 
 def add_concert(band, venue, days, **fields):
@@ -68,6 +70,7 @@ def test_music_event_block(band, venue):
     sold_out, cancelled = json_ld_blocks(page(band))
     assert sold_out["@type"] == "MusicEvent"
     assert sold_out["location"]["address"]["addressLocality"] == "Ris-Orangis"
+    assert sold_out["location"]["address"]["addressCountry"] == "FR"
     assert sold_out["location"]["geo"]["latitude"] == 48.6513
     assert sold_out["performer"] == {
         "@type": "MusicGroup",

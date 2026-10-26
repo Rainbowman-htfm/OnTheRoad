@@ -25,6 +25,7 @@ class VenueFields(TypedDict):
     address: str
     postal_code: str
     city: str
+    country: str
     latitude: str
     longitude: str
     website: str
@@ -64,6 +65,7 @@ def _venue_fields(result: dict[str, Any]) -> VenueFields:
         "postal_code": address.get("postcode", ""),
         # The commune; "municipality" can be a wider area (Grenoble for Fontanil-Cornillon), so it comes last
         "city": address.get("city") or address.get("town") or address.get("village") or address.get("municipality", ""),
+        "country": address.get("country_code", "").upper(),
         # Rounded to the 6 decimals our coordinates keep (≈ 10 cm)
         "latitude": f"{float(result['lat']):.6f}",
         "longitude": f"{float(result['lon']):.6f}",

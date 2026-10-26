@@ -40,6 +40,7 @@ def test_search_request_and_result(settings):
         "address": "1 Rue du Cornillon",
         "postal_code": "38120",
         "city": "Fontanil-Cornillon",  # the village, not the wider "municipality" (Grenoble)
+        "country": "FR",  # in capitals, as we keep it
         "latitude": result["latitude"],
         "longitude": result["longitude"],
         "website": "https://www.titi-twister.fr/",

@@ -2,6 +2,7 @@ from datetime import datetime
 from zoneinfo import ZoneInfo
 
 import pytest
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, transaction
 from django.db.models import ProtectedError
 
@@ -101,3 +102,10 @@ def test_previous_date_cleared_by_hand_stays_cleared(concert):
     concert.save()
     concert.refresh_from_db()
     assert concert.previous_starts_at is None
+
+
+def test_venue_country_tells_apart_two_cities_of_the_same_name():
+    assert str(Venue(name="Le Bataclan", city="Paris", country="FR")) == "Le Bataclan (Paris, FR)"
+    assert str(Venue(name="Le Bataclan", city="Paris")) == "Le Bataclan (Paris)"  # not known: as before
+    with pytest.raises(ValidationError):
+        Venue(name="Le Bataclan", city="Paris", country="France").full_clean()

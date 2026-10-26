@@ -245,8 +245,8 @@ def popup_pick(request: HttpRequest, obj: Venue | Event) -> HttpResponse:
 
 @admin.register(Venue)
 class VenueAdmin(admin.ModelAdmin):
-    list_display = ["name", "city", "postal_code"]
-    list_filter = ["city"]
+    list_display = ["name", "city", "postal_code", "country"]
+    list_filter = ["country", "city"]
     search_fields = ["name", "city"]
     inlines = [VenueLinkInline]
     add_form_template = "admin/concerts/venue/add_form.html"

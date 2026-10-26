@@ -27,7 +27,7 @@
       <td>{% for label, url in row.sources %}<a href="{{ url }}" target="_blank" rel="noopener">{{ label }}</a>{% if not forloop.last %} + {% endif %}{% endfor %}</td>
       <td>{{ row.result.type }}</td>
       <td>{{ row.result.address }}</td>
-      <td>{{ row.result.postal_code }} {{ row.result.city }}</td>
+      <td>{{ row.result.postal_code }} {{ row.result.city }}{% if row.result.country %}, {{ row.result.country }}{% endif %}</td>
       <td>{% if row.result.latitude %}yes{% else %}—{% endif %}</td>
       <td>{% if row.venue %}<a href="{{ row.venue_url }}">already added</a>{% else %}<a class="button" href="{{ row.use_url }}">Use this</a>{% endif %}</td>
     </tr>

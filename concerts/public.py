@@ -178,6 +178,8 @@ def music_event(concert: Concert, same_as: list[str]) -> dict[str, Any]:
         address["streetAddress"] = venue.address
     if venue.postal_code:
         address["postalCode"] = venue.postal_code
+    if venue.country:
+        address["addressCountry"] = venue.country
     location: dict[str, Any] = {
         "@type": "MusicVenue",
         "name": venue.name,
