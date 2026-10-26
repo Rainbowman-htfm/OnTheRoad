@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from django.db import transaction
-from django.db.models.signals import post_delete, post_save
+from django.db.models.signals import post_delete, post_save, pre_delete
 from django.dispatch import receiver
 
 from . import public
@@ -21,9 +21,23 @@ def rebuild(band_ids: Iterable[int]) -> None:
     transaction.on_commit(run)
 
 
+def bands_playing_with(band: Band) -> list[int]:
+    """The bands whose concerts list this one among the other bands of the night."""
+    return list(Concert.objects.filter(other_bands__band=band).values_list("band_id", flat=True).distinct())
+
+
 @receiver(post_save, sender=Band)
 def band_saved(sender: type[Band], instance: Band, **kwargs: Any) -> None:
-    rebuild([instance.pk])
+    # Its name and link also appear on the pages of the bands it played with
+    rebuild([instance.pk, *bands_playing_with(instance)])
+
+
+@receiver(pre_delete, sender=Band)
+def band_deleting(sender: type[Band], instance: Band, **kwargs: Any) -> None:
+    # It still played those nights: the other bands' concerts keep its name, without a link
+    others = bands_playing_with(instance)
+    OtherBand.objects.filter(band=instance).update(band=None, name=instance.name)
+    rebuild(others)
 
 
 @receiver(post_delete, sender=Band)
