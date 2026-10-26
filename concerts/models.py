@@ -228,7 +228,6 @@ class Concert(models.Model):
         "link", blank=True, help_text="Tickets: the ticket page. Otherwise the event's page or announcement."
     )
     entry = models.CharField(max_length=20, choices=Entry.choices, default=Entry.TICKETS)
-    support_acts = models.CharField(max_length=300, blank=True)
     announced_at = models.DateTimeField(
         default=timezone.now,
         help_text="Shown as new for 14 days. Set an earlier date for a concert already announced elsewhere.",
@@ -245,8 +244,17 @@ class Concert(models.Model):
             )
         ]
 
+    # Reverse relation, created by Django from the other side; declared for editors and type checkers
+    other_bands: "RelatedManager[OtherBand]"
+    # Not stored: each other band's name and page address, "" when not on this site (public.link_other_bands)
+    other_band_links: list[tuple[str, str]]
+
     def __str__(self) -> str:
         return f"{self.band} — {self.venue} — {timezone.localtime(self.starts_at):%Y-%m-%d}"
+
+    def other_band_names(self) -> list[str]:
+        # .all() rather than a new query, so a prefetch_related("other_bands__band") is used
+        return [str(act) for act in self.other_bands.all()]
 
     @property
     def shown_place(self) -> Festival | Venue:
@@ -265,3 +273,36 @@ class Concert(models.Model):
         ):
             self.previous_starts_at = None
         super().save(*args, **kwargs)
+
+
+class OtherBand(models.Model):
+    """Another band playing the same night ("other band" rather than "support act": the band of the page is not
+    always the headliner): a band on this site, linked to its page, or just a name. One table
+    for both, so they are listed in the order they were added."""
+
+    concert = models.ForeignKey(Concert, on_delete=models.CASCADE, related_name="other_bands")
+    # A band removed from the site disappears from the other bands' concerts too, as it asked
+    band = models.ForeignKey(
+        Band,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="+",
+        help_text="A band on this site: its name will link to its page.",
+    )
+    name = models.CharField(max_length=300, blank=True, help_text="Any other band, not on this site.")
+
+    class Meta:
+        ordering = ["pk"]  # the order they were added
+        constraints = [
+            # Checked by the database: a band or a name, never both or neither
+            models.CheckConstraint(
+                condition=(models.Q(band__isnull=False) & models.Q(name=""))
+                | (models.Q(band__isnull=True) & ~models.Q(name="")),
+                name="other_band_band_or_name",
+                violation_error_message="Choose a band on this site or type a name, not both.",
+            )
+        ]
+
+    def __str__(self) -> str:
+        return self.band.name if self.band else self.name

@@ -44,6 +44,8 @@ def add_concert(client, band, venue):
             "entry": "tickets",
             "announced_at_0": "2030-01-01",
             "announced_at_1": "12:00",
+            "other_bands-TOTAL_FORMS": "0",  # the other bands' table: no rows
+            "other_bands-INITIAL_FORMS": "0",
         },
     )
 
@@ -63,8 +65,8 @@ def test_share_and_style_only_for_their_bands(client, member, band, other_band, 
 
 
 def test_member_sees_only_their_concerts(client, member, band, other_band, venue):
-    Concert.objects.create(band=band, venue=venue, starts_at="2030-05-01T20:00Z", support_acts="Ours")
-    theirs = Concert.objects.create(band=other_band, venue=venue, starts_at="2030-05-02T20:00Z", support_acts="X")
+    Concert.objects.create(band=band, venue=venue, starts_at="2030-05-01T20:00Z")
+    theirs = Concert.objects.create(band=other_band, venue=venue, starts_at="2030-05-02T20:00Z")
     page = client.get("/admin/concerts/concert/").content.decode()
     assert "Damantra" in page and "Splenius" not in page
     assert client.get(f"/admin/concerts/concert/{theirs.pk}/change/").url == "/admin/"
@@ -112,3 +114,15 @@ def test_superuser_sees_every_band(client, band, other_band):
     assert "Damantra" in page and "Splenius" in page
     assert client.get(f"/admin/concerts/band/{other_band.pk}/share/").status_code == 200
     assert 'name="slug"' in client.get(f"/admin/concerts/band/{band.pk}/change/").content.decode()
+
+
+def test_member_chooses_any_band_as_other_band(client, member, band, other_band, venue):
+    found = client.get(
+        "/admin/autocomplete/", {"app_label": "concerts", "model_name": "otherband", "field_name": "band"}
+    ).json()
+    assert [result["text"] for result in found["results"]] == ["Damantra", "Splenius"]
+    concert = Concert.objects.create(band=band, venue=venue, starts_at="2030-05-01T20:00Z")
+    page = client.get(f"/admin/concerts/concert/{concert.pk}/change/").content.decode()
+    assert 'name="other_bands-0-band"' in page  # the other bands' table, for their concerts
+    # Choosing another band of the night does not open its page to them
+    assert client.get(f"/admin/concerts/band/{other_band.pk}/change/").url == "/admin/"
