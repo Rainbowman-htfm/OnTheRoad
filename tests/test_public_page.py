@@ -211,3 +211,16 @@ def test_other_band_is_a_band_or_a_name(band, venue):
     concert = add_concert(band, venue, days=3)
     with pytest.raises(IntegrityError):
         concert.other_bands.create(band=band, name="Novelists")
+
+
+def test_other_band_renamed_or_deleted_updates_the_page(band, venue, public_dir, django_capture_on_commit_callbacks):
+    splenius = Band.objects.create(name="Splenius", slug="splenius")
+    add_concert(band, venue, days=3).other_bands.create(band=splenius)
+    with django_capture_on_commit_callbacks(execute=True):
+        splenius.name = "Splenius (FR)"
+        splenius.save()
+    assert ">Splenius (FR)</a>" in (public_dir / "damantra" / "index.html").read_text()
+    with django_capture_on_commit_callbacks(execute=True):
+        splenius.delete()
+    # It still played that night: its name stays, without a link to a page that is gone
+    assert "with Splenius (FR)</span>" in (public_dir / "damantra" / "index.html").read_text()

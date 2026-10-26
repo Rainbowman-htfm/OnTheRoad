@@ -87,8 +87,14 @@ class ConcertInline(admin.StackedInline):
         return names or "—"
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Concert]:
-        # Upcoming concerts only, so the page stays short; past ones are in the list of concerts
-        return super().get_queryset(request).filter(starts_at__gte=public.start_of_today())
+        # Upcoming concerts only, so the page stays short; past ones are in the list of concerts.
+        # Their other bands in one more query, rather than one per concert
+        return (
+            super()
+            .get_queryset(request)
+            .filter(starts_at__gte=public.start_of_today())
+            .prefetch_related(public.OTHER_BANDS)
+        )
 
 
 def member_bands(request: HttpRequest) -> QuerySet[Band]:

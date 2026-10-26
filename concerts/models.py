@@ -277,10 +277,12 @@ class OtherBand(models.Model):
     for both, so they are listed in the order they were added."""
 
     concert = models.ForeignKey(Concert, on_delete=models.CASCADE, related_name="other_bands")
-    # A band removed from the site disappears from the other bands' concerts too, as it asked
+    # A band removed from the site stays in the other bands' concerts as a name: it still played those nights.
+    # The name is written just before the deletion (signals.py). SET_NULL, not CASCADE: Django lists the rows to
+    # delete before that signal, so CASCADE would delete them anyway
     band = models.ForeignKey(
         Band,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="+",
