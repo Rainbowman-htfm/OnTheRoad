@@ -137,6 +137,14 @@ class Venue(models.Model):
     address = models.CharField(max_length=300, blank=True)
     city = models.CharField(max_length=100)
     postal_code = models.CharField(max_length=10, blank=True)
+    # ISO 3166 code, "FR": short, the same in every language, and what schema.org and OpenStreetMap use.
+    # Blank when not known: MusicBrainz's search does not give it
+    country = models.CharField(
+        max_length=2,
+        blank=True,
+        validators=[RegexValidator("^[A-Z]{2}$", "Two capital letters: FR, BE, DE…")],
+        help_text="Two-letter code: FR, BE, DE…",
+    )
     # Decimal rather than float: exact value, 6 decimal places ≈ 10 cm
     latitude = models.DecimalField(max_digits=8, decimal_places=6, null=True, blank=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
@@ -154,7 +162,8 @@ class Venue(models.Model):
         ordering = ["city", "name"]
 
     def __str__(self) -> str:
-        return f"{self.name} ({self.city})"
+        # The country tells apart "Paris" in France and "Paris" in Texas
+        return f"{self.name} ({', '.join(part for part in (self.city, self.country) if part)})"
 
 
 class VenueLink(models.Model):
