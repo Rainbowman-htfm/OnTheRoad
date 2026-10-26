@@ -150,7 +150,7 @@ OTHER_BANDS = "other_bands__band"
 def upcoming_concerts(band: Band) -> QuerySet[Concert]:
     return (
         band.concerts.filter(starts_at__gte=start_of_today())
-        .select_related("venue", "festival")
+        .select_related("venue", "event")
         .prefetch_related(OTHER_BANDS)
     )
 
@@ -160,7 +160,7 @@ def just_announced() -> QuerySet[Concert]:
     return (
         Concert.objects.filter(announced_at__gte=new_since(), starts_at__gte=start_of_today())
         .exclude(status=Concert.Status.CANCELLED)
-        .select_related("band", "venue", "festival")
+        .select_related("band", "venue", "event")
         .prefetch_related(OTHER_BANDS)
         .order_by("-announced_at")
     )
@@ -200,7 +200,7 @@ def music_event(concert: Concert, same_as: list[str]) -> dict[str, Any]:
     event: dict[str, Any] = {
         "@context": "https://schema.org",
         "@type": "MusicEvent",
-        "name": f"{band.name} at {concert.shown_place.name}",
+        "name": f"{band.name} at {(concert.event or venue).name}",
         # A date alone when the time is not announced, which schema.org accepts
         "startDate": (
             timezone.localtime(concert.starts_at).date().isoformat()
@@ -219,10 +219,11 @@ def music_event(concert: Concert, same_as: list[str]) -> dict[str, Any]:
         "performer": performer,
         **({"isAccessibleForFree": True} if concert.entry == Concert.Entry.FREE else {}),
     }
-    if concert.festival:
-        event["superEvent"] = {"@type": "Festival", "name": concert.festival.name}
-        if concert.festival.website:
-            event["superEvent"]["url"] = concert.festival.website
+    if concert.event:
+        # "Event" rather than "Festival": true of a festival and of a named night alike
+        event["superEvent"] = {"@type": "Event", "name": concert.event.name}
+        if concert.event.website:
+            event["superEvent"]["url"] = concert.event.website
     if concert.previous_starts_at:
         event["previousStartDate"] = timezone.localdate(concert.previous_starts_at).isoformat()
     if concert.ticket_url and concert.entry != Concert.Entry.TICKETS:
@@ -332,7 +333,7 @@ def calendar(band: Band, claimed: bool) -> bytes:
     cal.add("version", "2.0")
     cal.add("x-wr-calname", f"{band.name} concerts")
     now = timezone.now()
-    for concert in band.concerts.select_related("venue", "festival").prefetch_related(OTHER_BANDS):
+    for concert in band.concerts.select_related("venue", "event").prefetch_related(OTHER_BANDS):
         venue = concert.venue
         event = Event()
         event.add("uid", concert_uid(concert))
@@ -346,7 +347,7 @@ def calendar(band: Band, claimed: bool) -> bytes:
             event.add("dtstart", concert.starts_at)
             if concert.ends_at:
                 event.add("dtend", concert.ends_at)
-        event.add("summary", f"{band.name} at {concert.shown_place.name}")
+        event.add("summary", f"{band.name} at {(concert.event or venue).name}")
         city = f"{venue.postal_code} {venue.city}".strip()
         event.add("location", ", ".join(part for part in (venue.name, venue.address, city) if part))
         event.add("status", ICAL_STATUS[concert.status])
@@ -378,7 +379,9 @@ def rss(concerts: list[Concert], claimed: set[int], band: Band | None = None) ->
     for concert in sorted(concerts, key=lambda concert: concert.announced_at, reverse=True):
         date = dateformat.format(timezone.localtime(concert.starts_at), "D j M Y")
         details = describe(concert)
-        title = f"{date} – {concert.shown_place.name}, {concert.venue.city}" + (f" ({details})" if details else "")
+        title = f"{date} – {(concert.event or concert.venue).name}, {concert.venue.city}" + (
+            f" ({details})" if details else ""
+        )
         feed.add_item(
             title=title if band else f"{concert.band.name}: {title}",
             link=concert.ticket_url or page_url(concert.band),
@@ -415,7 +418,7 @@ def home_bands() -> list[dict[str, Any]]:
     upcoming = (
         Concert.objects.filter(starts_at__gte=start_of_today())
         .exclude(status=Concert.Status.CANCELLED)
-        .select_related("venue", "festival")
+        .select_related("venue", "event")
         .order_by("starts_at")
     )
     next_concert: dict[int, Concert] = {}

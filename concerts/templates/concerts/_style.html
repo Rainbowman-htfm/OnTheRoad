@@ -27,12 +27,14 @@ a { color: inherit; }
 .status-cancelled { color: #c22; font-weight: 600; }
 .new { font-size: .7em; font-weight: 600; text-transform: uppercase; color: var(--accent); border: 1px solid var(--accent); border-radius: var(--radius); padding: 0 .3em; vertical-align: .15em; }
 .credit { font-size: .75em; opacity: .7; }
+/* The venue of a named event, on its own line under the event's name: secondary */
+.at { display: block; font-size: .85em; font-weight: normal; opacity: .7; }
 .moved { display: block; font-size: .85em; font-weight: 600; color: var(--accent); }
-/* Wide space: venue, city, time, support act and distance line up in columns.
-   At full width the venue column keeps about 8rem; minmax(0, …) lets it shrink rather than push the row
-   wider, so every row keeps the same columns */
+/* Wide space: venue, city, time, other bands and distance line up in columns. The venue and the other
+   bands share what is left, about 11rem each at full width; minmax(0, …) lets them shrink rather than push
+   the row wider, so every row keeps the same columns */
 @media (min-width: 900px) {
-  .info { display: grid; grid-template-columns: minmax(0, 1fr) 9rem 8rem 9rem 4rem; align-items: center; gap: .8rem; }
+  .info { display: grid; grid-template-columns: minmax(0, 1fr) 9rem 8rem minmax(0, 1fr) 4rem; align-items: center; gap: .8rem; }
   .venue { display: inline; }
   .details { display: contents; opacity: 1; }
   .details span { opacity: .7; }
