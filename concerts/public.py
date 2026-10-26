@@ -143,8 +143,16 @@ def new_since() -> datetime:
     return timezone.now() - timedelta(days=NEW_DAYS)
 
 
+# The other bands of the night and their pages, in one more query for all the concerts rather than one per concert
+OTHER_BANDS = "other_bands__band"
+
+
 def upcoming_concerts(band: Band) -> QuerySet[Concert]:
-    return band.concerts.filter(starts_at__gte=start_of_today()).select_related("venue", "festival")
+    return (
+        band.concerts.filter(starts_at__gte=start_of_today())
+        .select_related("venue", "festival")
+        .prefetch_related(OTHER_BANDS)
+    )
 
 
 def just_announced() -> QuerySet[Concert]:
@@ -153,6 +161,7 @@ def just_announced() -> QuerySet[Concert]:
         Concert.objects.filter(announced_at__gte=new_since(), starts_at__gte=start_of_today())
         .exclude(status=Concert.Status.CANCELLED)
         .select_related("band", "venue", "festival")
+        .prefetch_related(OTHER_BANDS)
         .order_by("-announced_at")
     )
 
@@ -228,12 +237,21 @@ def music_event(concert: Concert, same_as: list[str]) -> dict[str, Any]:
     return event
 
 
+def link_other_bands(concerts: list[Concert]) -> None:
+    """Each other band of the night, with its page when it is on this site, for the page and the widget."""
+    for concert in concerts:
+        concert.other_band_links = [
+            (str(act), page_url(act.band) if act.band else "") for act in concert.other_bands.all()
+        ]
+
+
 def json_for_script(data: Any) -> SafeString:
     # "<" escaped so a name containing "</script>" cannot end the block early
     return mark_safe(json.dumps(data, ensure_ascii=False).replace("<", "\\u003c"))
 
 
 def band_page(band: Band, concerts: list[Concert], band_links: list[str], claimed: bool) -> str:
+    link_other_bands(concerts)
     links = ([band.website] if band.website else []) + band_links
     return render_to_string(
         "concerts/band_page.html",
@@ -271,6 +289,7 @@ def embed_code(band: Band, template: str = "concerts/embed_code.html") -> str:
 
 
 def widget_page(band: Band, concerts: list[Concert]) -> str:
+    link_other_bands(concerts)
     return render_to_string(
         "concerts/widget.html",
         {
@@ -286,15 +305,15 @@ def widget_page(band: Band, concerts: list[Concert]) -> str:
 
 
 def describe(concert: Concert) -> str:
-    """Extra information for feeds: status if not planned, previous date, free or pay what you can, support acts."""
+    """Extra information for feeds: status if not planned, previous date, free or pay what you can, other bands."""
     parts = [] if concert.status == Concert.Status.PLANNED else [Concert.Status(concert.status).label.capitalize()]
     if concert.previous_starts_at:
         was = dateformat.format(timezone.localtime(concert.previous_starts_at), "M j")
         parts.append(f"Rescheduled (was {was})")
     if concert.entry != Concert.Entry.TICKETS:
         parts.append(Concert.Entry(concert.entry).label.capitalize())
-    if concert.support_acts:
-        parts.append(f"with {concert.support_acts}")
+    if names := concert.other_band_names():
+        parts.append("with " + ", ".join(names))
     return " · ".join(parts)
 
 
@@ -313,7 +332,7 @@ def calendar(band: Band, claimed: bool) -> bytes:
     cal.add("version", "2.0")
     cal.add("x-wr-calname", f"{band.name} concerts")
     now = timezone.now()
-    for concert in band.concerts.select_related("venue", "festival"):
+    for concert in band.concerts.select_related("venue", "festival").prefetch_related(OTHER_BANDS):
         venue = concert.venue
         event = Event()
         event.add("uid", concert_uid(concert))

@@ -46,7 +46,8 @@ def built(site, band, name):
 
 def test_calendar_keeps_past_and_cancelled_concerts(site, band, venue):
     past = add_concert(band, venue, days=-30)
-    cancelled = add_concert(band, venue, days=10, status=Concert.Status.CANCELLED, support_acts="Novelists")
+    cancelled = add_concert(band, venue, days=10, status=Concert.Status.CANCELLED)
+    cancelled.other_bands.create(name="Novelists")
     events = {str(e["uid"]): e for e in Calendar.from_ical(built(site, band, "concerts.ics")).walk("VEVENT")}
     assert set(events) == {f"concert-{past.pk}@dates.example", f"concert-{cancelled.pk}@dates.example"}
     event = events[f"concert-{cancelled.pk}@dates.example"]

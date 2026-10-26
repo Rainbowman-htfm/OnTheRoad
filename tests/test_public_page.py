@@ -3,6 +3,7 @@ import re
 from datetime import timedelta
 
 import pytest
+from django.db import IntegrityError
 from django.utils import timezone
 
 from concerts import public
@@ -43,8 +44,8 @@ def json_ld_blocks(html):
 
 
 def test_only_upcoming_concerts(band, venue):
-    add_concert(band, venue, days=-2, support_acts="Past band")
-    add_concert(band, venue, days=10, support_acts="Future band")
+    add_concert(band, venue, days=-2).other_bands.create(name="Past band")
+    add_concert(band, venue, days=10).other_bands.create(name="Future band")
     html = page(band)
     assert "Future band" in html
     assert "Past band" not in html
@@ -96,8 +97,9 @@ def test_venue_name_links_to_its_website(band, venue, public_dir):
 def test_query_count_does_not_grow_with_concerts(band, venue, django_assert_num_queries):
     for days in range(1, 6):
         add_concert(band, venue, days=days)
-    # The upcoming concerts with their venues, the band's links, whether it has members, every concert for the calendar
-    with django_assert_num_queries(4):
+    # The upcoming concerts with their venues and their other bands, the band's links, whether it has members,
+    # every concert for the calendar with their other bands
+    with django_assert_num_queries(6):
         public.build_band(band)
 
 
@@ -111,7 +113,7 @@ def test_json_ld_cannot_close_script_tag(band):
 
 def test_saving_a_concert_rewrites_the_page(band, venue, public_dir, django_capture_on_commit_callbacks):
     with django_capture_on_commit_callbacks(execute=True):
-        add_concert(band, venue, days=5, support_acts="Novelists")
+        add_concert(band, venue, days=5).other_bands.create(name="Novelists")
     assert "with Novelists" in (public_dir / "damantra" / "index.html").read_text()
     with django_capture_on_commit_callbacks(execute=True):
         venue.name = "Le Plan (Big Room)"
@@ -194,3 +196,18 @@ def test_guide_for_bands_is_built_and_linked(public_dir, client, settings):
     assert 'href="guide.html"' in (public_dir / "index.html").read_text()
     client.force_login(Account.objects.create_superuser("admin@example.org"))
     assert f'href="{public.site_url()}/guide.html"' in client.get("/admin/").content.decode()
+
+
+def test_other_bands_on_the_site_link_to_their_page(band, venue, settings):
+    settings.SITE_URL = "https://dates.example"
+    splenius = Band.objects.create(name="Splenius", slug="splenius")
+    concert = add_concert(band, venue, days=3)
+    concert.other_bands.create(band=splenius)
+    concert.other_bands.create(name="Novelists")
+    assert 'with <a href="https://dates.example/splenius/">Splenius</a>, Novelists' in page(band)
+
+
+def test_other_band_is_a_band_or_a_name(band, venue):
+    concert = add_concert(band, venue, days=3)
+    with pytest.raises(IntegrityError):
+        concert.other_bands.create(band=band, name="Novelists")

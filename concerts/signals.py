@@ -8,7 +8,7 @@ from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
 from . import public
-from .models import Band, BandLink, Concert, Festival, Membership, Venue
+from .models import Band, BandLink, Concert, Festival, Membership, OtherBand, Venue
 
 
 def rebuild(band_ids: Iterable[int]) -> None:
@@ -40,6 +40,12 @@ def band_part_changed(
     sender: type[Concert | BandLink | Membership], instance: Concert | BandLink | Membership, **kwargs: Any
 ) -> None:
     rebuild([instance.band_id])
+
+
+@receiver([post_save, post_delete], sender=OtherBand)
+def other_band_changed(sender: type[OtherBand], instance: OtherBand, **kwargs: Any) -> None:
+    # Through the concert, which may be gone already when a band and its concerts are deleted
+    rebuild(Concert.objects.filter(pk=instance.concert_id).values_list("band_id", flat=True))
 
 
 @receiver(post_save, sender=Venue)

@@ -17,7 +17,7 @@ from django.urls import URLPattern, path, reverse
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from . import musicbrainz, openstreetmap, public, venue_search
-from .models import Account, Band, BandLink, Concert, Festival, Membership, Venue, VenueLink
+from .models import Account, Band, BandLink, Concert, Festival, Membership, OtherBand, Venue, VenueLink
 
 # "View site" in the admin, and the guide link on its home page: the public pages
 admin.site.site_url = public.site_url() + "/"
@@ -69,7 +69,7 @@ class ConcertInline(admin.StackedInline):
                     "festival",
                     "status",
                     ("ticket_url", "entry"),
-                    "support_acts",
+                    "other_bands_shown",
                 ]
             },
         ),
@@ -77,6 +77,14 @@ class ConcertInline(admin.StackedInline):
         ("More", {"fields": ["previous_starts_at", "announced_at"], "classes": ["collapse"]}),
     ]
     autocomplete_fields = ["venue", "festival"]
+    # Django cannot put the other bands' table inside this block: shown here, changed on the concert's page
+    readonly_fields = ["other_bands_shown"]
+    show_change_link = True
+
+    @admin.display(description="Other bands")
+    def other_bands_shown(self, concert: Concert) -> str:
+        names = ", ".join(concert.other_band_names()) if concert.pk else ""
+        return names or "—"
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Concert]:
         # Upcoming concerts only, so the page stays short; past ones are in the list of concerts
@@ -129,7 +137,10 @@ class BandAdmin(admin.ModelAdmin):
     fields = ["name", "slug", "musicbrainz_id", "website"]  # the style has its own page
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Band]:
-        # Also used by the change, delete and autocomplete views: other bands are "not found"
+        # Choosing another band of the night: any band on the site (their names are public anyway)
+        if request.path == reverse("admin:autocomplete") and request.GET.get("model_name") == "otherband":
+            return super().get_queryset(request)
+        # Also used by the change, delete and other autocomplete views: other bands are "not found"
         return super().get_queryset(request).filter(pk__in=member_bands(request))
 
     def get_readonly_fields(self, request: HttpRequest, obj: Band | None = None) -> list[str]:
@@ -360,6 +371,15 @@ class VenueAdmin(admin.ModelAdmin):
         return popup_pick(request, venue)
 
 
+class OtherBandInline(admin.TabularInline):
+    """The other bands of the night: a band on this site, or a name."""
+
+    model = OtherBand
+    extra = 1
+    fields = ["band", "name"]
+    autocomplete_fields = ["band"]
+
+
 @admin.register(Festival)
 class FestivalAdmin(admin.ModelAdmin):
     list_display = ["name", "website"]
@@ -452,7 +472,8 @@ class FestivalAdmin(admin.ModelAdmin):
 class ConcertAdmin(admin.ModelAdmin):
     list_display = ["starts_at", "band", "venue", "status"]
     list_filter = ["status", ("band", admin.RelatedOnlyFieldListFilter), "venue__city"]
-    search_fields = ["band__name", "venue__name", "venue__city", "support_acts"]
+    search_fields = ["band__name", "venue__name", "venue__city", "other_bands__name", "other_bands__band__name"]
+    inlines = [OtherBandInline]
     date_hierarchy = "starts_at"
     autocomplete_fields = ["band", "venue", "festival"]
 
