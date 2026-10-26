@@ -1,5 +1,6 @@
 """Regenerate public pages after each change made in the admin."""
 
+import threading
 from collections.abc import Iterable
 from typing import Any
 
@@ -10,11 +11,24 @@ from django.dispatch import receiver
 from . import public
 from .models import Band, BandLink, Concert, Event, Membership, OtherBand, Venue
 
+# The bands waiting to be rebuilt: one save in the admin sends many signals (the concert, each of its other
+# bands…), each page is still built once. One set per thread, so two saves at the same time do not mix
+pending = threading.local()
+
 
 def rebuild(band_ids: Iterable[int]) -> None:
-    # After the transaction commits, so a rolled-back save never reaches the public page
+    # Read now: once committed, a deleted concert no longer tells its band
+    pending.ids = getattr(pending, "ids", set()) | set(band_ids)
+
+    # After the transaction commits, so a rolled-back save never reaches the public page. The first of these
+    # jobs builds every band waiting, the next ones find nothing left. A rolled-back save leaves its bands
+    # waiting: they are built with the next one, from the database, so never wrong. That is why a job is
+    # scheduled on every call, not only when the set was empty: after a rollback it would stay full forever
     def run() -> None:
-        for band in Band.objects.filter(pk__in=band_ids):
+        ids, pending.ids = pending.ids, set()
+        if not ids:
+            return
+        for band in Band.objects.filter(pk__in=ids):
             public.build_band(band)
         public.build_home()  # its "just announced" list shows concerts of every band
 

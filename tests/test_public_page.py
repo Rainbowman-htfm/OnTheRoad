@@ -3,7 +3,7 @@ import re
 from datetime import timedelta
 
 import pytest
-from django.db import IntegrityError
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from concerts import public
@@ -227,3 +227,14 @@ def test_other_band_renamed_or_deleted_updates_the_page(band, venue, public_dir,
         splenius.delete()
     # It still played that night: its name stays, without a link to a page that is gone
     assert "with Splenius (FR)</span>" in (public_dir / "damantra" / "index.html").read_text()
+
+
+def test_one_save_builds_each_page_once(band, venue, monkeypatch, django_capture_on_commit_callbacks):
+    built: list[str] = []
+    monkeypatch.setattr(public, "build_band", lambda band: built.append(band.slug))
+    monkeypatch.setattr(public, "build_home", lambda: built.append("home"))
+    with django_capture_on_commit_callbacks(execute=True), transaction.atomic():  # one save in the admin
+        concert = add_concert(band, venue, days=3)
+        for name in ("Novelists", "Splenius", "Landmvrks"):
+            concert.other_bands.create(name=name)
+    assert built == ["damantra", "home"]  # not once per signal: 4 of them
