@@ -28,11 +28,13 @@ def distance_metres(a: Mapping[str, Any], b: Mapping[str, Any]) -> float | None:
 
 def same_venue(a: Mapping[str, Any], b: Mapping[str, Any]) -> bool:
     """Same name, and in the same city or close together (a city written differently). Coordinates alone
-    are not enough to tell two venues apart: MusicBrainz's are typed by hand, sometimes a few km off."""
+    are not enough to tell two venues apart: MusicBrainz's are typed by hand, sometimes a few km off. A city
+    missing on both sides tells nothing: then only the distance counts."""
     if normalize(a["name"]) != normalize(b["name"]):
         return False
     distance = distance_metres(a, b)
-    return normalize(a["city"]) == normalize(b["city"]) or (distance is not None and distance <= SAME_PLACE_METRES)
+    city = normalize(a["city"])
+    return (city != "" and city == normalize(b["city"])) or (distance is not None and distance <= SAME_PLACE_METRES)
 
 
 def merge(musicbrainz: Sequence[Mapping[str, Any]], openstreetmap: Sequence[Mapping[str, Any]]) -> list[dict[str, Any]]:

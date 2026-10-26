@@ -74,6 +74,8 @@ def test_same_name_far_apart_in_another_city_is_another_venue():
     no_coordinates = {"name": "Le Plan", "city": "Ris-Orangis", "latitude": "", "longitude": ""}
     assert venue_search.same_venue(no_coordinates, {**no_coordinates, "city": "ris orangis"})
     assert not venue_search.same_venue(no_coordinates, {**no_coordinates, "city": "Paris"})
+    # No city on either side, no coordinates: nothing says it is the same venue
+    assert not venue_search.same_venue({**no_coordinates, "city": ""}, {**no_coordinates, "city": ""})
 
 
 def test_admin_search_lists_both_sources_once(admin_client, network):
