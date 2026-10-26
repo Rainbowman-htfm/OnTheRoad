@@ -39,3 +39,17 @@ def test_other_bands_text_becomes_one_row_as_written():
     new = executor.loader.project_state([("concerts", "0015_other_bands")]).apps
     names = new.get_model("concerts", "OtherBand").objects.values_list("name", flat=True)
     assert list(names) == ["Sangham and Novelist"]
+
+
+@pytest.mark.django_db(transaction=True)
+def test_festivals_become_events():
+    # Band members' rights after the rename: test_events.py, on a database built with every migration
+    executor = MigrationExecutor(connection)
+    executor.migrate([("concerts", "0015_other_bands")])
+    old = executor.loader.project_state([("concerts", "0015_other_bands")]).apps
+    old.get_model("concerts", "Festival").objects.create(name="Metal Fest 09")
+
+    executor = MigrationExecutor(connection)  # reloaded: the graph changed
+    executor.migrate([("concerts", "0016_festival_to_event")])
+    new = executor.loader.project_state([("concerts", "0016_festival_to_event")]).apps
+    assert list(new.get_model("concerts", "Event").objects.values_list("name", flat=True)) == ["Metal Fest 09"]

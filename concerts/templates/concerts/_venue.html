@@ -1,1 +1,1 @@
-{% with place=concert.shown_place %}{% if place.website %}<a href="{{ place.website }}"{% if new_tab %} target="_blank"{% endif %} rel="noopener">{{ place.name }}</a>{% else %}{{ place.name }}{% endif %}{% endwith %}
+{% with place=concert.event|default:concert.venue %}{% if place.website %}<a href="{{ place.website }}"{% if new_tab %} target="_blank"{% endif %} rel="noopener">{{ place.name }}</a>{% else %}{{ place.name }}{% endif %}{% endwith %}

@@ -168,14 +168,15 @@ class VenueLink(models.Model):
         return self.url
 
 
-class Festival(models.Model):
-    """The festival from one year to the next ("Hellfest"), not one edition: the year is the concert's date.
-    Shared between bands, like venues; each concert keeps its own venue, so a festival may move."""
+class Event(models.Model):
+    """A named event concerts are part of: a festival ("Hellfest"), or a night an association organises in a
+    village hall ("Concert 100% Girls"). Not one edition: the year is the concert's date, so the same event
+    comes back every year. Shared between bands, like venues; each concert keeps its own venue."""
 
     # Not unique: there is a Hellfest in France and one in the USA. The search field avoids duplicates
     name = models.CharField(max_length=200)
     website = models.URLField(blank=True)
-    # The MusicBrainz "series" of type Festival, not one year's event; null rather than empty, as for bands
+    # For a festival, the MusicBrainz "series" of type Festival, not one year's event; null rather than empty
     musicbrainz_id = models.UUIDField("MusicBrainz ID", null=True, blank=True, unique=True)
 
     # Reverse relation, created by Django from the other side; declared for editors and type checkers
@@ -203,13 +204,13 @@ class Concert(models.Model):
     # Deleting a band deletes its concerts; a venue that still has concerts cannot be deleted
     band = models.ForeignKey(Band, on_delete=models.CASCADE, related_name="concerts")
     venue = models.ForeignKey(Venue, on_delete=models.PROTECT, related_name="concerts")
-    festival = models.ForeignKey(
-        Festival,
+    event = models.ForeignKey(
+        Event,
         on_delete=models.PROTECT,
         null=True,
         blank=True,
         related_name="concerts",
-        help_text="If the concert is part of one: its name is shown instead of the venue's.",
+        help_text="A festival, or a night with a name: shown before the venue.",
     )
     # Stored in UTC, displayed in the TIME_ZONE setting (USE_TZ = True)
     starts_at = models.DateTimeField("date and time")
@@ -255,11 +256,6 @@ class Concert(models.Model):
     def other_band_names(self) -> list[str]:
         # .all() rather than a new query, so a prefetch_related("other_bands__band") is used
         return [str(act) for act in self.other_bands.all()]
-
-    @property
-    def shown_place(self) -> Festival | Venue:
-        """What fans look for: the festival when the concert is part of one, otherwise the venue."""
-        return self.festival or self.venue
 
     def save(self, *args: Any, **kwargs: Any) -> None:
         if self.pk and self.previous_starts_at is None:

@@ -1,7 +1,7 @@
 {% extends "admin/base_site.html" %}
 {% block breadcrumbs %}
 <div class="breadcrumbs">
-<a href="{% url 'admin:index' %}">Home</a> › <a href="{% url 'admin:concerts_festival_changelist' %}">Festivals</a> › Find a festival
+<a href="{% url 'admin:index' %}">Home</a> › <a href="{% url 'admin:concerts_event_changelist' %}">Events</a> › Find a festival
 </div>
 {% endblock %}
 {% block content %}
@@ -23,13 +23,13 @@
       <td>{{ row.result.name }}</td>
       <td>{{ row.result.disambiguation }}</td>
       <td><a href="{{ row.musicbrainz_url }}" target="_blank" rel="noopener">MusicBrainz</a></td>
-      <td>{% if row.festival %}<a href="{{ row.festival_url }}">already added</a>{% else %}<a class="button" href="{{ row.use_url }}">Use this</a>{% endif %}</td>
+      <td>{% if row.event %}<a href="{{ row.event_url }}">already added</a>{% else %}<a class="button" href="{{ row.use_url }}">Use this</a>{% endif %}</td>
     </tr>
     {% endfor %}
     </tbody>
   </table>
   {% elif not messages %}
-  <p>No festival found. Try a shorter name, or go back and fill in the form yourself.</p>
+  <p>No festival found. Try a shorter name, or go back and fill in the form yourself: for a night with a name, the name is enough.</p>
   {% endif %}
 {% endif %}
 <p class="help">Data from <a href="https://musicbrainz.org" target="_blank" rel="noopener">MusicBrainz</a> (CC0); check the result before saving.</p>
