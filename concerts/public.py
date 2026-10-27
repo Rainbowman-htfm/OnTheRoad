@@ -249,8 +249,9 @@ def music_event(concert: Concert, same_as: list[str]) -> dict[str, Any]:
         **({"isAccessibleForFree": True} if concert.entry == Concert.Entry.FREE else {}),
     }
     if concert.event:
-        # "Event" rather than "Festival": true of a festival and of a named night alike
-        event["superEvent"] = {"@type": "Event", "name": concert.event.name}
+        # A series: the event across years, not one edition (the concert has the date). A plain "Event" without a
+        # date and place is checked by Google as an event of its own, and marked invalid
+        event["superEvent"] = {"@type": "EventSeries", "name": concert.event.name}
         if concert.event.website:
             event["superEvent"]["url"] = concert.event.website
     if concert.previous_starts_at:

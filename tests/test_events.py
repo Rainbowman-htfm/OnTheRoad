@@ -76,7 +76,7 @@ def test_event_name_first_then_the_venue_smaller(site, band, venue, hellfest):
     [block] = re.findall(r'<script type="application/ld\+json">(.*?)</script>', page)
     event = json.loads(block)
     assert event["name"] == "Damantra at Hellfest"
-    assert event["superEvent"] == {"@type": "Event", "name": "Hellfest", "url": "https://hellfest.fr"}
+    assert event["superEvent"] == {"@type": "EventSeries", "name": "Hellfest", "url": "https://hellfest.fr"}
     assert event["location"]["name"] == "Val de Moine"  # where it is stays the venue
     [item] = Calendar.from_ical((site / "damantra" / "concerts.ics").read_bytes()).walk("VEVENT")
     assert item["summary"] == "Damantra at Hellfest" and str(item["location"]).startswith("Val de Moine")
