@@ -155,6 +155,17 @@ def upcoming_concerts(band: Band) -> QuerySet[Concert]:
     )
 
 
+def past_concerts(band: Band) -> QuerySet[Concert]:
+    """The band's past shows, latest first; a cancelled one never happened."""
+    return (
+        band.concerts.filter(starts_at__lt=start_of_today())
+        .exclude(status=Concert.Status.CANCELLED)
+        .select_related("venue", "event")
+        .prefetch_related(OTHER_BANDS)
+        .order_by("-starts_at")
+    )
+
+
 def just_announced() -> QuerySet[Concert]:
     """Upcoming concerts of every band announced in the last NEW_DAYS days, latest first."""
     return (
@@ -270,19 +281,21 @@ def json_for_script(data: Any) -> SafeString:
 
 
 def band_page(band: Band, concerts: list[Concert], band_links: list[str], claimed: bool) -> str:
-    link_other_bands(concerts)
+    past = list(past_concerts(band))
+    link_other_bands(concerts + past)
     links = ([band.website] if band.website else []) + band_links
     return render_to_string(
         "concerts/band_page.html",
         {
             "band": band,
             "concerts": concerts,
+            "past": past,
             "events": [json_for_script(music_event(concert, band_links)) for concert in concerts],
             "links": [(url, link_label(url)) for url in links],
             "calendar_url": calendar_url(band),
             "style": band_style(band),
             "new_since": new_since(),
-            "osm_credit": osm_credit(concerts),
+            "osm_credit": osm_credit(concerts + past),
             "claimed": claimed,
             "unclaimed_links": {} if claimed else unclaimed_links(band),
         },
