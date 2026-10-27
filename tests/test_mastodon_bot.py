@@ -47,9 +47,11 @@ class Fake:
     def save(self, state: dict[str, Any]) -> None:
         self.state = json.loads(json.dumps(state))  # a copy, as written to the file
 
-    def run(self, events: list[dict[str, Any]], now: datetime = NOW) -> list[tuple[str, str | None]]:
+    def run(
+        self, events: list[dict[str, Any]], now: datetime = NOW, modified: str = ""
+    ) -> list[tuple[str, str | None]]:
         before = len(self.posts)
-        mastodon_bot.run(events, self.state, now, self.post, self.save)
+        mastodon_bot.run(events, self.state, now, self.post, self.save, modified)
         return self.posts[before:]
 
 
@@ -87,11 +89,13 @@ def test_many_dates_fit_in_one_post():
 
 def test_at_most_five_posts_an_hour_the_rest_waits():
     bot = Fake()
-    bot.run([])
+    bot.run([], modified="Sat, 31 Oct 2026 08:00:00 GMT")
     events = [concert(number, band=f"Band {number}") for number in range(7)]
-    assert len(bot.run(events)) == 5
+    assert len(bot.run(events, modified="Sun, 01 Nov 2026 08:00:00 GMT")) == 5
+    assert bot.state and bot.state["modified"] == "Sat, 31 Oct 2026 08:00:00 GMT"  # the file is needed again
     assert bot.run(events, NOW + timedelta(minutes=15)) == []
-    assert len(bot.run(events, NOW + timedelta(minutes=61))) == 2  # the two left, announced once each
+    assert len(bot.run(events, NOW + timedelta(minutes=61), "Sun, 01 Nov 2026 08:00:00 GMT")) == 2  # announced once
+    assert bot.state["modified"] == "Sun, 01 Nov 2026 08:00:00 GMT"  # all posted
     assert bot.run(events, NOW + timedelta(hours=2)) == []
 
 
@@ -102,10 +106,12 @@ def test_cancelled_or_moved_replies_to_the_announcement():
     cancelled = concert(1, eventStatus="https://schema.org/EventCancelled")
     moved = concert(2, start="2026-11-21T20:30:00+01:00", eventStatus="https://schema.org/EventRescheduled")
     assert bot.run([cancelled, moved]) == [
-        ("Cancelled: Sat 14 Nov, 20:30 – Le Bouillon, Orléans", "post-1"),
-        ("New date: Sat 21 Nov, 20:30 – Le Bouillon, Orléans", "post-1"),
+        ("Cancelled: MADAM · Sat 14 Nov, 20:30 – Le Bouillon, Orléans", "post-1"),
+        ("New date: MADAM · Sat 21 Nov, 20:30 – Le Bouillon, Orléans", "post-1"),
     ]
     assert bot.run([cancelled, moved]) == []  # said once
+    assert bot.run([concert(1), moved]) == [("Back on: MADAM · Sat 14 Nov, 20:30 – Le Bouillon, Orléans", "post-1")]
+    assert bot.run([cancelled, moved]) == [("Cancelled: MADAM · Sat 14 Nov, 20:30 – Le Bouillon, Orléans", "post-1")]
 
 
 def test_time_announced_later_is_not_a_new_date():
@@ -127,25 +133,19 @@ def test_concerts_gone_from_the_file_are_forgotten():
     bot = Fake()
     bot.run([concert(1)])
     bot.run([])
-    assert bot.state == {"concerts": {}, "posted": []}
+    assert bot.state == {"concerts": {}, "posted": [], "modified": ""}
 
 
 def test_main_reads_the_site_and_posts_to_mastodon(monkeypatch, tmp_path):
     state_file = tmp_path / "state.json"
     state_file.write_text(json.dumps({"concerts": {}, "posted": []}))
-    for name, value in {
-        "BOT_SITE_URL": "https://dates.example/",
-        "MASTODON_URL": "https://mastodon.example",
-        "MASTODON_TOKEN": "secret",
-        "BOT_STATE_FILE": str(state_file),
-    }.items():
-        monkeypatch.setenv(name, value)
+    mastodon_settings(monkeypatch, state_file)
     requests: list[httpx.Request] = []
 
     def handler(request: httpx.Request) -> httpx.Response:
         requests.append(request)
         if request.url.host == "dates.example":
-            return httpx.Response(200, json=[concert(1)])
+            return httpx.Response(200, json=[concert(1)], headers={"Last-Modified": "Sun, 01 Nov 2026 08:00:00 GMT"})
         return httpx.Response(200, json={"id": "110"})
 
     mastodon_bot.main(httpx.MockTransport(handler))
@@ -157,7 +157,52 @@ def test_main_reads_the_site_and_posts_to_mastodon(monkeypatch, tmp_path):
     assert status.headers["Idempotency-Key"]
     form = parse_qs(status.content.decode())
     assert form["visibility"] == ["unlisted"] and form["status"][0].startswith("MADAM: 1 new date")
-    assert json.loads(state_file.read_text())["concerts"]["concert-1@dates.example"]["post"] == "110"
+    assert "If-Modified-Since" not in site.headers  # no date saved yet
+    state = json.loads(state_file.read_text())
+    assert state["concerts"]["concert-1@dates.example"]["post"] == "110"
+    assert state["modified"] == "Sun, 01 Nov 2026 08:00:00 GMT"
+
+
+def mastodon_settings(monkeypatch, state_file):
+    for name, value in {
+        "BOT_SITE_URL": "https://dates.example/",
+        "MASTODON_URL": "https://mastodon.example",
+        "MASTODON_TOKEN": "secret",
+        "BOT_STATE_FILE": str(state_file),
+    }.items():
+        monkeypatch.setenv(name, value)
+
+
+def test_file_not_downloaded_again_until_it_changes(monkeypatch, tmp_path):
+    state_file = tmp_path / "state.json"
+    state_file.write_text(json.dumps({"concerts": {}, "posted": [], "modified": "Sun, 01 Nov 2026 08:00:00 GMT"}))
+    mastodon_settings(monkeypatch, state_file)
+    asked: list[str | None] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        asked.append(request.headers.get("If-Modified-Since"))
+        return httpx.Response(304)
+
+    mastodon_bot.main(httpx.MockTransport(handler))
+    assert asked == ["Sun, 01 Nov 2026 08:00:00 GMT"]  # and nothing posted
+
+
+def test_announcement_deleted_by_hand_the_reply_is_posted_alone(monkeypatch, tmp_path):
+    state_file = tmp_path / "state.json"
+    known = {"concert-1@dates.example": {"start": "2026-11-14T20:30:00+01:00", "cancelled": False, "post": "109"}}
+    state_file.write_text(json.dumps({"concerts": known, "posted": []}))
+    mastodon_settings(monkeypatch, state_file)
+    replies: list[list[str]] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "dates.example":
+            return httpx.Response(200, json=[concert(1, eventStatus="https://schema.org/EventCancelled")])
+        replies.append(parse_qs(request.content.decode()).get("in_reply_to_id", []))
+        return httpx.Response(404) if replies[-1] else httpx.Response(200, json={"id": "110"})
+
+    mastodon_bot.main(httpx.MockTransport(handler))
+    assert replies == [["109"], []]
+    assert json.loads(state_file.read_text())["concerts"]["concert-1@dates.example"]["cancelled"]
 
 
 def test_without_a_token_it_only_shows_the_posts(monkeypatch, tmp_path, capsys):
