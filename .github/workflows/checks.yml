@@ -16,5 +16,5 @@ jobs:
       - run: pip install -e ".[dev]"
       - run: ruff format --check .
       - run: ruff check .
-      - run: mypy concerts config tests
+      - run: mypy concerts config integrations tests
       - run: pytest

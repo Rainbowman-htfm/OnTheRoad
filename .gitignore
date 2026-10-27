@@ -7,3 +7,5 @@ public/
 *.egg-info/
 .mypy_cache/
 staticfiles/
+# What the Mastodon bot posted (integrations/mastodon_bot.py)
+mastodon_bot.json
