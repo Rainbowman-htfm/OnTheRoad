@@ -33,7 +33,8 @@ PER_HOUR, PER_DAY = 5, 50
 MAX_LENGTH = 500
 
 Entry = dict[str, Any]  # one concert of /events.json
-State = dict[str, Any]  # {"concerts": {identifier: {"start", "cancelled", "post"}}, "posted": [times]}
+# {"concerts": {identifier: {"start", "cancelled", "post"}}, "posted": [times], "modified": the file's Last-Modified}
+State = dict[str, Any]
 Post = Callable[[str, str | None], str]  # (text, post replied to) → the new post's id
 
 
@@ -77,9 +78,16 @@ def is_cancelled(entry: Entry) -> bool:
     return entry["event"]["eventStatus"].endswith("EventCancelled")
 
 
-def run(events: list[Entry], saved: State | None, now: datetime, post: Post, save: Callable[[State], None]) -> None:
+def run(
+    events: list[Entry],
+    saved: State | None,
+    now: datetime,
+    post: Post,
+    save: Callable[[State], None],
+    modified: str = "",
+) -> None:
     """Post what changed since the last run, and save the state after each post: if the bot stops halfway,
-    nothing is posted twice."""
+    nothing is posted twice. modified: the file's Last-Modified, kept once everything in it is posted."""
     current = {entry["event"]["identifier"]: entry for entry in events}
     if saved is None:
         # First run: the dates already on the site are known, not announced, so the account does not open
@@ -88,7 +96,7 @@ def run(events: list[Entry], saved: State | None, now: datetime, post: Post, sav
             key: {"start": entry["event"]["startDate"], "cancelled": is_cancelled(entry)}
             for key, entry in current.items()
         }
-        save({"concerts": concerts, "posted": []})
+        save({"concerts": concerts, "posted": [], "modified": modified})
         return
     state = saved
     known: dict[str, dict[str, Any]] = state["concerts"]
@@ -109,17 +117,22 @@ def run(events: list[Entry], saved: State | None, now: datetime, post: Post, sav
         before = known.get(key)
         if not (before and before.get("post")):
             continue
-        if is_cancelled(entry) and not before["cancelled"]:
-            text = f"Cancelled: {line(entry)}"
+        cancelled = is_cancelled(entry)
+        # The band's name too: the reply is posted alone when the announcement was deleted
+        about = f"{entry['band']['name']} · {line(entry)}"
+        if cancelled and not before["cancelled"]:
+            text = f"Cancelled: {about}"
+        elif before["cancelled"] and not cancelled:
+            text = f"Back on: {about}"
         # Another day, as on the site: a time announced or corrected on the same day is not a new date
-        elif not is_cancelled(entry) and entry["event"]["startDate"][:10] != before["start"][:10]:
-            text = f"New date: {line(entry)}"
+        elif not cancelled and entry["event"]["startDate"][:10] != before["start"][:10]:
+            text = f"New date: {about}"
         else:
             continue
         if not may_post():
-            return  # the next run goes on from here
+            return  # the next run goes on from here, with the file downloaded again
         posted(text, before["post"])
-        before.update(start=entry["event"]["startDate"], cancelled=is_cancelled(entry))
+        before.update(start=entry["event"]["startDate"], cancelled=cancelled)
         save(state)
 
     # New dates, one post per band; one already cancelled is not news
@@ -133,7 +146,7 @@ def run(events: list[Entry], saved: State | None, now: datetime, post: Post, sav
             bands.setdefault(entry["band"]["page"], []).append(entry)
     for entries in bands.values():
         if not may_post():
-            break  # not marked as known: announced by a next run
+            break  # not marked as known: announced by a next run, with the file downloaded again
         post_id = posted(announcement(entries))
         for entry in entries:
             known[entry["event"]["identifier"]] = {
@@ -142,6 +155,10 @@ def run(events: list[Entry], saved: State | None, now: datetime, post: Post, sav
                 "post": post_id,
             }
         save(state)
+
+    if all(key in known for key in current):
+        # Everything is posted: until the file changes, the next runs need not download it again
+        state["modified"] = modified
 
     # Concerts gone from the file: past, or deleted because entered by mistake
     for key in [key for key in known if key not in current]:
@@ -158,6 +175,9 @@ def mastodon_post(client: httpx.Client, visibility: str) -> Post:
             # Mastodon ignores a post sent again with the same key within an hour (a retry after a timeout)
             headers={"Idempotency-Key": hashlib.sha256(f"{reply_to}\n{text}".encode()).hexdigest()},
         )
+        if response.status_code == 404 and reply_to:
+            # The announcement was deleted by hand: posted alone rather than blocking every next run
+            return post(text, None)
         response.raise_for_status()
         return response.json()["id"]
 
@@ -178,12 +198,17 @@ def main(transport: httpx.BaseTransport | None = None) -> None:
     read_env_file()
     site = os.environ["BOT_SITE_URL"].rstrip("/")
     state_file = Path(os.environ.get("BOT_STATE_FILE", ROOT / "mastodon_bot.json"))
+    state = json.loads(state_file.read_text()) if state_file.exists() else None
     headers = {"User-Agent": f"OTR-mastodon-bot/0.1 (+{site})"}
     with httpx.Client(headers=headers, transport=transport, timeout=30) as http:
-        response = http.get(f"{site}/events.json")
+        # "Not modified", without the file, when it has not changed since everything in it was posted
+        since = {"If-Modified-Since": state["modified"]} if state and state.get("modified") else {}
+        response = http.get(f"{site}/events.json", headers=since)
+        if response.status_code == 304:
+            return
         response.raise_for_status()
         events = response.json()
-    state = json.loads(state_file.read_text()) if state_file.exists() else None
+        modified = response.headers.get("Last-Modified", "")
     now = datetime.now().astimezone()
     token = os.environ.get("MASTODON_TOKEN", "")
     if not token:
@@ -205,7 +230,8 @@ def main(transport: httpx.BaseTransport | None = None) -> None:
         transport=transport,
         timeout=30,
     ) as mastodon:
-        run(events, state, now, mastodon_post(mastodon, os.environ.get("MASTODON_VISIBILITY", "unlisted")), save)
+        visibility = os.environ.get("MASTODON_VISIBILITY", "unlisted")
+        run(events, state, now, mastodon_post(mastodon, visibility), save, modified)
 
 
 if __name__ == "__main__":
