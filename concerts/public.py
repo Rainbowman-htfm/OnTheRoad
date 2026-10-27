@@ -166,6 +166,20 @@ def just_announced() -> QuerySet[Concert]:
     )
 
 
+def announced_by_band(concerts: list[Concert]) -> list[dict[str, Any]]:
+    """Just announced, one line per band so a whole tour stays one line; the band that announced last first,
+    as concerts come from just_announced(). Like the Mastodon bot's posts."""
+    bands: dict[int, list[Concert]] = {}
+    for concert in concerts:
+        bands.setdefault(concert.band_id, []).append(concert)
+    lines = []
+    for dates in bands.values():
+        dates.sort(key=lambda concert: concert.starts_at)
+        cities = list(dict.fromkeys(concert.venue.city for concert in dates))
+        lines.append({"band": dates[0].band, "dates": dates, "cities": cities[:3], "more_cities": len(cities) > 3})
+    return lines
+
+
 def link_label(url: str) -> str:
     return (urlparse(url).hostname or url).removeprefix("www.")
 
@@ -480,7 +494,7 @@ def build_home() -> None:
         "concerts/home.html",
         {
             "bands": bands,
-            "announced": announced,
+            "announced": announced_by_band(announced),
             "osm_credit": osm_credit(shown),
             "contact": settings.CONTACT_EMAIL,
             "source": settings.SOURCE_URL,

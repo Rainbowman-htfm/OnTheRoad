@@ -29,7 +29,7 @@ footer { margin-top: 2rem; font-size: .9em; }
 {% if announced %}
 <h2>Just announced</h2>
 <ul class="announced">
-{% for concert in announced %}<li><a href="{{ concert.band.slug }}/"><strong>{{ concert.band.name }}</strong></a> · {% if concert.time_tba %}{{ concert.starts_at|date:"D j M" }}{% else %}{{ concert.starts_at|date:"D j M, H:i" }}{% endif %} · {% include "concerts/_venue.html" %}, {{ concert.venue.city }}</li>
+{% for line in announced %}<li><a href="{{ line.band.slug }}/"><strong>{{ line.band.name }}</strong></a> · {% with concert=line.dates.0 %}{% if line.dates|length == 1 %}{% if concert.time_tba %}{{ concert.starts_at|date:"D j M" }}{% else %}{{ concert.starts_at|date:"D j M, H:i" }}{% endif %} · {% include "concerts/_venue.html" %}, {{ concert.venue.city }}{% else %}{{ line.dates|length }} new dates, from {{ concert.starts_at|date:"D j M" }} · {{ line.cities|join:", " }}{% if line.more_cities %}…{% endif %}{% endif %}{% endwith %}</li>
 {% endfor %}</ul>
 <p class="muted">Follow new announcements: <a href="just-announced.xml">RSS</a></p>
 {% endif %}
