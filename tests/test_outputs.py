@@ -11,7 +11,7 @@ from django.utils import timezone
 from icalendar import Calendar
 
 from concerts import public
-from concerts.models import Band, Concert, Venue
+from concerts.models import Account, Band, Concert, Membership, Venue
 
 pytestmark = pytest.mark.django_db
 
@@ -276,3 +276,28 @@ def test_every_json_ld_block_on_the_page_is_a_complete_music_event(site, band, v
         assert event["location"]["@type"] == "MusicVenue" and event["location"]["address"]["addressLocality"]
         assert event["performer"]["@type"] == "MusicGroup"
     assert blocks[0].count("tickets.example") == 1  # offers.url when there is a ticket link
+
+
+def test_site_events_json_lists_every_band_for_tools(site, band, venue, settings):
+    settings.SITE_URL = "https://dates.example"
+    splenius = Band.objects.create(name="Splenius", slug="splenius")
+    Membership.objects.create(account=Account.objects.create_user("member@example.org"), band=splenius)
+    add_concert(band, venue, days=-2)  # past: left out
+    later = add_concert(band, venue, days=9, status=Concert.Status.CANCELLED)  # cancelled: kept, so tools see it
+    sooner = add_concert(splenius, venue, days=4)
+    sooner.other_bands.create(band=band)
+    sooner.other_bands.create(name="Novelists")
+    public.build_all()
+    events = json.loads((site / "events.json").read_text())
+    assert [entry["event"]["identifier"] for entry in events] == [
+        f"concert-{concert.pk}@dates.example" for concert in (sooner, later)
+    ]  # soonest first, the calendars' UID
+    assert events[0]["band"] == {"name": "Splenius", "page": "https://dates.example/splenius/", "claimed": True}
+    assert events[1]["band"]["claimed"] is False
+    assert events[0]["other_bands"] == [
+        {"name": "Damantra", "page": "https://dates.example/damantra/"},
+        {"name": "Novelists", "page": ""},
+    ]
+    assert events[0]["announced_at"] == timezone.localtime(sooner.announced_at).isoformat()
+    # The same schema.org event as the band's own events.json
+    assert events[1]["event"] in json.loads((site / "damantra" / "events.json").read_text())

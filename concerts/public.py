@@ -202,6 +202,8 @@ def music_event(concert: Concert, same_as: list[str]) -> dict[str, Any]:
     event: dict[str, Any] = {
         "@context": "https://schema.org",
         "@type": "MusicEvent",
+        # The same as the calendars' UID: a tool reading this recognises a concert even after its date changes
+        "identifier": concert_uid(concert),
         "name": f"{band.name} at {(concert.event or venue).name}",
         # A date alone when the time is not announced, which schema.org accepts
         "startDate": (
@@ -395,6 +397,34 @@ def rss(concerts: list[Concert], claimed: set[int], band: Band | None = None) ->
     return feed.writeString("utf-8")
 
 
+def site_events() -> list[dict[str, Any]]:
+    """Every upcoming concert of every band, soonest first, for tools built over the site (a Mastodon bot, a
+    town's agenda): the schema.org MusicEvent, as in each band's events.json, and what schema.org has no
+    place for: the band's page, whether it manages it, when the date was announced, the other bands' pages."""
+    concerts = (
+        Concert.objects.filter(starts_at__gte=start_of_today())
+        .select_related("band", "venue", "event")
+        .prefetch_related(OTHER_BANDS, "band__links")
+        .order_by("starts_at", "pk")
+    )
+    claimed = claimed_band_ids()
+    return [
+        {
+            "band": {
+                "name": concert.band.name,
+                "page": page_url(concert.band),
+                "claimed": concert.band_id in claimed,
+            },
+            "announced_at": timezone.localtime(concert.announced_at).isoformat(),
+            "other_bands": [
+                {"name": str(act), "page": page_url(act.band) if act.band else ""} for act in concert.other_bands.all()
+            ],
+            "event": music_event(concert, [link.url for link in concert.band.links.all()]),
+        }
+        for concert in concerts
+    ]
+
+
 def build_band(band: Band) -> None:
     concerts = list(upcoming_concerts(band))
     # The band's links are loaded once, not once per concert
@@ -440,8 +470,8 @@ def home_bands() -> list[dict[str, Any]]:
 
 
 def build_home() -> None:
-    """Home page (just announced concerts, then the bands), the site's "just announced" feed, the
-    "Your data" page and the guide for bands, at the root of PUBLIC_DIR."""
+    """Home page (just announced concerts, then the bands), the site's "just announced" feed and events.json,
+    the "Your data" page and the guide for bands, at the root of PUBLIC_DIR."""
     settings.PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
     announced = list(just_announced())
     bands = home_bands()
@@ -463,6 +493,7 @@ def build_home() -> None:
     )
     (settings.PUBLIC_DIR / "index.html").write_text(html, encoding="utf-8")
     (settings.PUBLIC_DIR / "just-announced.xml").write_text(rss(announced, claimed_band_ids()), encoding="utf-8")
+    (settings.PUBLIC_DIR / "events.json").write_text(json_for_script(site_events()), encoding="utf-8")
     # A file, not a folder: no clash with a band called "data", and the nightly cleanup of folders leaves it
     data_page = render_to_string(
         "concerts/data.html", {"contact": settings.CONTACT_EMAIL, "source": settings.SOURCE_URL}

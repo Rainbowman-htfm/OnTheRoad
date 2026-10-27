@@ -37,6 +37,12 @@ code { font-size: .9em; }
   <li><strong>No tracking.</strong> No cookies on public pages, no analytics, no third-party scripts, fonts or images. The only cookie is the login of band members, in the space where they manage their dates.</li>
 </ul>
 
+<h2>For developers</h2>
+<ul>
+  <li><strong><code>/events.json</code></strong>: every upcoming concert of every band, soonest first, to build tools over the site (a bot, a town's agenda, a map). Each concert has its schema.org event, as in each band's <code>events.json</code>, with a permanent <code>identifier</code> that stays the same when its date or venue changes; then its band (name, page, whether the band manages it), when it was announced, and the other bands of the night. Rebuilt after every change, and every night.</li>
+  <li><strong><code>/just-announced.xml</code></strong>: the latest announcements, as an RSS feed.</li>
+</ul>
+
 <h2>Licences</h2>
 <ul>
   <li><strong>Concert dates and band information</strong> are released under <a href="https://creativecommons.org/publicdomain/zero/1.0/">CC0</a>: anyone can reuse them, without conditions.</li>
