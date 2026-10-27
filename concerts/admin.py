@@ -17,7 +17,7 @@ from django.urls import URLPattern, path, reverse
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from . import musicbrainz, openstreetmap, public, venue_search
-from .models import Account, Band, BandLink, Concert, Event, Membership, OtherBand, Venue, VenueLink
+from .models import Account, Band, BandLink, Concert, Event, Membership, Venue, VenueLink
 
 # "View site" in the admin, and the guide link on its home page: the public pages
 admin.site.site_url = public.site_url() + "/"
@@ -53,10 +53,59 @@ class VenueLinkInline(admin.TabularInline):
     extra = 1
 
 
+class ConcertForm(forms.ModelForm):
+    """A concert, on its own page or in its block on the band's page. The other bands are typed as one line of
+    names, in order: Django cannot put a table of them inside the band page's blocks, and one line is quicker to
+    type on a phone than a table anyway."""
+
+    other_bands = forms.CharField(
+        required=False,
+        help_text="Separated by commas, in order. A band on this site links to its page.",
+    )
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:
+            self.initial["other_bands"] = ", ".join(self.instance.other_band_names())
+
+    def clean_other_bands(self) -> list[str]:
+        return [name.strip() for name in self.cleaned_data["other_bands"].split(",") if name.strip()]
+
+    def save(self, commit: bool = True) -> Concert:
+        concert = super().save(commit)
+        if commit:  # the band page's blocks; the concert's own page saves later, see ConcertAdmin.save_related
+            self.save_other_bands()
+        return concert
+
+    def save_other_bands(self) -> None:
+        concert = self.instance
+        saved = [(act.band, act.name) for act in concert.other_bands.all()]
+        # A band already linked stays linked, even when another band has the same name
+        linked = {band.name.lower(): band for band, _ in saved if band}
+
+        def row(name: str) -> tuple[Band | None, str]:
+            band = linked.get(name.lower())
+            if band is None:
+                # Any band of the site, even one this account does not manage (band names are public); linked
+                # only when the name is a single band: band names are not unique
+                bands = list(Band.objects.filter(name__iexact=name)[:2])
+                band = bands[0] if len(bands) == 1 else None
+            return band, "" if band else name
+
+        # Compared with the rows rather than with the text shown: an old row "A, B" looks like the line "A, B",
+        # and a name typed before its band joined the site gets its link on the next save
+        rows = [row(name) for name in self.cleaned_data["other_bands"]]
+        if rows != saved:
+            concert.other_bands.all().delete()
+            for band, name in rows:
+                concert.other_bands.create(band=band, name=name)
+
+
 class ConcertInline(admin.StackedInline):
     """One block per concert rather than a wide table: easier to read and fill in on a phone."""
 
     model = Concert
+    form = ConcertForm
     extra = 1
     fieldsets = [
         (
@@ -69,7 +118,7 @@ class ConcertInline(admin.StackedInline):
                     "event",
                     "status",
                     ("ticket_url", "entry"),
-                    "other_bands_shown",
+                    "other_bands",
                 ]
             },
         ),
@@ -77,14 +126,7 @@ class ConcertInline(admin.StackedInline):
         ("More", {"fields": ["previous_starts_at", "announced_at"], "classes": ["collapse"]}),
     ]
     autocomplete_fields = ["venue", "event"]
-    # Django cannot put the other bands' table inside this block: shown here, changed on the concert's page
-    readonly_fields = ["other_bands_shown"]
     show_change_link = True
-
-    @admin.display(description="Other bands")
-    def other_bands_shown(self, concert: Concert) -> str:
-        names = ", ".join(concert.other_band_names()) if concert.pk else ""
-        return names or "—"
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Concert]:
         # Upcoming concerts only, so the page stays short; past ones are in the list of concerts.
@@ -143,10 +185,7 @@ class BandAdmin(admin.ModelAdmin):
     fields = ["name", "slug", "musicbrainz_id", "website"]  # the style has its own page
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Band]:
-        # Choosing another band of the night: any band on the site (their names are public anyway)
-        if request.path == reverse("admin:autocomplete") and request.GET.get("model_name") == "otherband":
-            return super().get_queryset(request)
-        # Also used by the change, delete and other autocomplete views: other bands are "not found"
+        # Also used by the change, delete and autocomplete views: other bands are "not found"
         return super().get_queryset(request).filter(pk__in=member_bands(request))
 
     def get_readonly_fields(self, request: HttpRequest, obj: Band | None = None) -> list[str]:
@@ -377,15 +416,6 @@ class VenueAdmin(admin.ModelAdmin):
         return popup_pick(request, venue)
 
 
-class OtherBandInline(admin.TabularInline):
-    """The other bands of the night: a band on this site, or a name."""
-
-    model = OtherBand
-    extra = 1
-    fields = ["band", "name"]
-    autocomplete_fields = ["band"]
-
-
 @admin.register(Event)
 class EventAdmin(admin.ModelAdmin):
     list_display = ["name", "website"]
@@ -479,7 +509,7 @@ class ConcertAdmin(admin.ModelAdmin):
     list_display = ["starts_at", "band", "venue", "status"]
     list_filter = ["status", ("band", admin.RelatedOnlyFieldListFilter), "venue__city"]
     search_fields = ["band__name", "venue__name", "venue__city", "other_bands__name", "other_bands__band__name"]
-    inlines = [OtherBandInline]
+    form = ConcertForm
     date_hierarchy = "starts_at"
     autocomplete_fields = ["band", "venue", "event"]
 
@@ -491,6 +521,11 @@ class ConcertAdmin(admin.ModelAdmin):
         if db_field.name == "band":
             kwargs["queryset"] = member_bands(request)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def save_related(self, request: HttpRequest, form: Any, formsets: Any, change: bool) -> None:
+        # The concert is saved by now (the admin saves its form with commit=False, then the concert)
+        super().save_related(request, form, formsets, change)
+        form.save_other_bands()
 
     def response_add(self, request: HttpRequest, obj: Concert, post_url_continue: str | None = None) -> HttpResponse:
         response = super().response_add(request, obj, post_url_continue)

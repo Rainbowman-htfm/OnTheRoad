@@ -32,7 +32,7 @@ def member(client, band):
     return account
 
 
-def add_concert(client, band, venue):
+def add_concert(client, band, venue, **fields):
     return client.post(
         "/admin/concerts/concert/add/",
         {
@@ -44,9 +44,8 @@ def add_concert(client, band, venue):
             "entry": "tickets",
             "announced_at_0": "2030-01-01",
             "announced_at_1": "12:00",
-            "other_bands-TOTAL_FORMS": "0",  # the other bands' table: no rows
-            "other_bands-INITIAL_FORMS": "0",
-        },
+        }
+        | fields,
     )
 
 
@@ -116,13 +115,8 @@ def test_superuser_sees_every_band(client, band, other_band):
     assert 'name="slug"' in client.get(f"/admin/concerts/band/{band.pk}/change/").content.decode()
 
 
-def test_member_chooses_any_band_as_other_band(client, member, band, other_band, venue):
-    found = client.get(
-        "/admin/autocomplete/", {"app_label": "concerts", "model_name": "otherband", "field_name": "band"}
-    ).json()
-    assert [result["text"] for result in found["results"]] == ["Damantra", "Splenius"]
-    concert = Concert.objects.create(band=band, venue=venue, starts_at="2030-05-01T20:00Z")
-    page = client.get(f"/admin/concerts/concert/{concert.pk}/change/").content.decode()
-    assert 'name="other_bands-0-band"' in page  # the other bands' table, for their concerts
+def test_member_names_any_band_as_other_band(client, member, band, other_band, venue):
+    add_concert(client, band, venue, other_bands="Splenius")
+    assert Concert.objects.get().other_bands.get().band == other_band  # linked to its page
     # Choosing another band of the night does not open its page to them
     assert client.get(f"/admin/concerts/band/{other_band.pk}/change/").url == "/admin/"
