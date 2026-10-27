@@ -259,6 +259,15 @@ def test_just_announced_on_home_page_feed_and_badge(site, band, venue, django_ca
     assert [item.findtext("title", "").startswith("Damantra: ") for item in feed.iter("item")] == [True]
 
 
+def test_just_announced_shows_a_tour_as_one_line(site, band, venue):
+    for days, city in [(20, "Lyon"), (10, None), (30, "Lille"), (40, "Nantes"), (50, "Brest")]:
+        add_concert(band, Venue.objects.create(name="Club", city=city) if city else venue, days=days)
+    public.build_home()
+    home = (site / "index.html").read_text()
+    assert home.count("Damantra</strong></a>") == 1
+    assert "5 new dates, from " in home and " · Ris-Orangis, Lyon, Lille…</li>" in home  # by date
+
+
 def test_home_page_hides_just_announced_when_empty(site, band):
     public.build_home()
     assert "<h2>Just announced" not in (site / "index.html").read_text()
