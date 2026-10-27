@@ -14,6 +14,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect
 from django.template.response import TemplateResponse
 from django.urls import URLPattern, path, reverse
+from django.utils import timezone
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from . import musicbrainz, openstreetmap, public, venue_search
@@ -178,7 +179,7 @@ class StyleForm(forms.ModelForm):
 
 @admin.register(Band)
 class BandAdmin(admin.ModelAdmin):
-    list_display = ["name", "slug"]
+    list_display = ["name", "slug", "checked_at"]  # sort by "dates checked": the bands to look at again
     search_fields = ["name"]
     prepopulated_fields = {"slug": ["name"]}
     inlines = [ConcertInline, BandLinkInline, MembershipInline]
@@ -187,6 +188,10 @@ class BandAdmin(admin.ModelAdmin):
     def get_queryset(self, request: HttpRequest) -> QuerySet[Band]:
         # Also used by the change, delete and autocomplete views: other bands are "not found"
         return super().get_queryset(request).filter(pk__in=member_bands(request))
+
+    def save_model(self, request: HttpRequest, obj: Band, form: Any, change: bool) -> None:
+        obj.checked_at = timezone.now()
+        super().save_model(request, obj, form, change)
 
     def get_readonly_fields(self, request: HttpRequest, obj: Band | None = None) -> list[str]:
         # Changing the address would break fans' subscribed feeds: only an administrator does it
@@ -521,6 +526,11 @@ class ConcertAdmin(admin.ModelAdmin):
         if db_field.name == "band":
             kwargs["queryset"] = member_bands(request)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+    def save_model(self, request: HttpRequest, obj: Concert, form: Any, change: bool) -> None:
+        super().save_model(request, obj, form, change)
+        # An update rather than a save: the concert's own save already rebuilds the band's page
+        Band.objects.filter(pk=obj.band_id).update(checked_at=timezone.now())
 
     def save_related(self, request: HttpRequest, form: Any, formsets: Any, change: bool) -> None:
         # The concert is saved by now (the admin saves its form with commit=False, then the concert)
