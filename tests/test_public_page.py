@@ -1,3 +1,4 @@
+import gzip
 import json
 import re
 from datetime import timedelta
@@ -143,6 +144,11 @@ def test_public_files_are_served(client, band, public_dir):
     assert client.get("/").status_code == 200  # the home page
     assert client.get("/damantra/").status_code == 200
     assert client.get("/damantra/events.json")["Access-Control-Allow-Origin"] == "*"
+    compressed = client.get("/damantra/", headers={"Accept-Encoding": "gzip"})
+    assert compressed["Content-Encoding"] == "gzip"
+    assert gzip.decompress(b"".join(compressed.streaming_content)).startswith(b"<!doctype html>")
+    assert "Content-Encoding" not in client.get("/damantra/")  # a client that did not ask for it
+    assert "Content-Encoding" not in client.get("/admin/login/", headers={"Accept-Encoding": "gzip"})  # secrets
 
 
 def test_build_all_removes_pages_of_renamed_bands(band, public_dir):

@@ -3,6 +3,7 @@ from django.contrib import admin
 from django.http import FileResponse, HttpRequest, HttpResponse
 from django.urls import URLPattern, URLResolver, path
 from django.views.decorators.clickjacking import xframe_options_exempt
+from django.views.decorators.gzip import gzip_page
 from django.views.static import serve
 
 from concerts import login
@@ -16,6 +17,9 @@ urlpatterns: list[URLPattern | URLResolver] = [
 
 
 @xframe_options_exempt  # the widget must be allowed in other sites' iframes
+# Compressed when the browser accepts it, about 6 times smaller. Only the public files: compressing pages that hold
+# secrets, as the admin's do, can leak them (the "BREACH" attack). A separate web server would compress them itself
+@gzip_page
 def public_file(request: HttpRequest, path: str) -> HttpResponse | FileResponse:
     """Serve the generated public files (see SERVE_FILES)."""
     if path == "" or path.endswith("/"):
