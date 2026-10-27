@@ -92,6 +92,9 @@ class Band(models.Model):
     font = models.CharField(max_length=10, choices=Font.choices, default=Font.SANS)
     corners = models.CharField(max_length=10, choices=Corners.choices, default=Corners.SLIGHT)
     members = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Membership", related_name="bands", blank=True)
+    # Last save of the band or one of its concerts in the admin: whoever saves has just checked its dates, even
+    # without changing anything. Shown on the band's page: how fresh its dates are, whoever keeps them
+    checked_at = models.DateTimeField("dates checked", null=True, blank=True, editable=False)
 
     # Reverse relations, created by Django from the other side; declared for editors and type checkers
     links: "RelatedManager[BandLink]"

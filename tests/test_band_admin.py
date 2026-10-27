@@ -64,3 +64,24 @@ def test_other_bands_typed_as_one_line():
     assert typed("Novelist, Sangham") == [(None, "Novelist"), (sangham, "")]  # the same text splits it
     unchanged = list(concert.other_bands.values_list("pk", flat=True))
     assert typed("Novelist, Sangham") and list(concert.other_bands.values_list("pk", flat=True)) == unchanged
+
+
+def test_saving_marks_the_dates_checked(admin_client, settings, django_capture_on_commit_callbacks):
+    band = Band.objects.create(name="Damantra", slug="damantra")
+    venue = Venue.objects.create(name="Le Plan", city="Ris-Orangis")
+    form = {
+        "band": band.pk,
+        "venue": venue.pk,
+        "starts_at_0": "2030-05-01",
+        "starts_at_1": "20:30",
+        "status": "planned",
+        "entry": "tickets",
+        "announced_at_0": "2030-01-01",
+        "announced_at_1": "12:00",
+    }
+    with django_capture_on_commit_callbacks(execute=True):  # the page rebuilt after the save
+        admin_client.post("/admin/concerts/concert/add/", form)  # a concert saved: its band's dates were checked
+    band.refresh_from_db()
+    assert band.checked_at and timezone.now() - band.checked_at < timedelta(minutes=1)
+    page = (settings.PUBLIC_DIR / "damantra" / "index.html").read_text()
+    assert f"Dates checked on {timezone.localdate():%-d %b %Y} · " in page
