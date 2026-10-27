@@ -3,8 +3,10 @@
 from datetime import timedelta
 
 import pytest
+from django.forms import modelform_factory
 from django.utils import timezone
 
+from concerts.admin import ConcertForm
 from concerts.models import Band, Concert, Venue
 
 pytestmark = pytest.mark.django_db
@@ -20,7 +22,7 @@ def test_band_page_lists_upcoming_concerts_and_adds_one(admin_client):
     venue = Venue.objects.create(name="Le Plan", city="Ris-Orangis")
     for days, other in ((-3, "Past band"), (3, "Next band")):
         concert = Concert.objects.create(band=band, venue=venue, starts_at=timezone.now() + timedelta(days=days))
-        concert.other_bands.create(name=other)  # shown, read only, in the concert's block
+        concert.other_bands.create(name=other)  # in the concert's block
     page = admin_client.get(f"/admin/concerts/band/{band.pk}/change/").content.decode()
     assert "Next band" in page and "Past band" not in page  # past ones are in the list of concerts
     add_url = f"/admin/concerts/concert/add/?band={band.pk}"
@@ -35,8 +37,30 @@ def test_band_page_lists_upcoming_concerts_and_adds_one(admin_client):
         "entry": "tickets",
         "announced_at_0": "2030-01-01",
         "announced_at_1": "12:00",
-        "other_bands-TOTAL_FORMS": "0",  # the other bands' table: no rows
-        "other_bands-INITIAL_FORMS": "0",
     }
     assert admin_client.post(add_url, form).url == f"/admin/concerts/band/{band.pk}/change/"  # back to the band
     assert admin_client.post(add_url, form | {"_addanother": "1"}).url == add_url  # the next one, same band
+
+
+def test_other_bands_typed_as_one_line():
+    band = Band.objects.create(name="Damantra", slug="damantra")
+    sangham = Band.objects.create(name="Sangham", slug="sangham")
+    concert = Concert.objects.create(band=band, venue=Venue.objects.create(name="Le Plan"), starts_at=timezone.now())
+    Form = modelform_factory(Concert, form=ConcertForm, fields=["other_bands"])
+
+    def typed(line):
+        form = Form({"other_bands": line}, instance=concert)
+        assert form.is_valid()
+        form.save()
+        return [(act.band, act.name) for act in concert.other_bands.all()]
+
+    assert typed("Novelists,  sangham ,") == [(None, "Novelists"), (sangham, "")]  # linked to the band's page
+    assert Form(instance=concert).initial["other_bands"] == "Novelists, Sangham"
+    Band.objects.create(name="Novelists", slug="novelists-fr")
+    Band.objects.create(name="Novelists", slug="novelists-us")
+    assert typed("Novelists") == [(None, "Novelists")]  # two bands of that name: not linked
+    assert typed("") == []
+    concert.other_bands.create(name="Novelist, Sangham")  # one row, typed with a comma in an older version
+    assert typed("Novelist, Sangham") == [(None, "Novelist"), (sangham, "")]  # the same text splits it
+    unchanged = list(concert.other_bands.values_list("pk", flat=True))
+    assert typed("Novelist, Sangham") and list(concert.other_bands.values_list("pk", flat=True)) == unchanged
