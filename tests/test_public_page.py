@@ -48,9 +48,9 @@ def json_ld_blocks(html):
 def test_only_upcoming_concerts(band, venue):
     add_concert(band, venue, days=-2).other_bands.create(name="Past band")
     add_concert(band, venue, days=10).other_bands.create(name="Future band")
-    html = page(band)
-    assert "Future band" in html
-    assert "Past band" not in html
+    upcoming, past = page(band).split('<details class="past">')
+    assert "Future band" in upcoming and "Past band" not in upcoming
+    assert "Past band" in past and "Future band" not in past
 
 
 def test_statuses(band, venue):
@@ -101,8 +101,8 @@ def test_query_count_does_not_grow_with_concerts(band, venue, django_assert_num_
     for days in range(1, 6):
         add_concert(band, venue, days=days)
     # The upcoming concerts with their venues and their other bands, the band's links, whether it has members,
-    # every concert for the calendar with their other bands
-    with django_assert_num_queries(6):
+    # every concert for the calendar with their other bands, the past shows (none: their other bands not asked)
+    with django_assert_num_queries(7):
         public.build_band(band)
 
 
@@ -238,3 +238,21 @@ def test_one_save_builds_each_page_once(band, venue, monkeypatch, django_capture
         for name in ("Novelists", "Splenius", "Landmvrks"):
             concert.other_bands.create(name=name)
     assert built == ["damantra", "home"]  # not once per signal: 4 of them
+
+
+def test_past_shows_folded_latest_first_without_cancelled(band, venue):
+    add_concert(band, venue, days=-400)
+    latest = add_concert(band, Venue.objects.create(name="Le Ferrailleur", city="Nantes"), days=-30)
+    latest.other_bands.create(name="Novelists")
+    add_concert(band, venue, days=-10, status=Concert.Status.CANCELLED)
+    html = page(band)
+    past = html[html.index('<details class="past">') :]
+    assert "<summary>Past shows (2)</summary>" in past
+    assert past.index("Le Ferrailleur") < past.index("Le Plan")  # latest first
+    assert "with Novelists" in past
+    assert len(json_ld_blocks(html)) == 0  # past dates are not offered to search engines
+
+
+def test_no_past_shows_no_section(band, venue):
+    add_concert(band, venue, days=3)
+    assert '<details class="past">' not in page(band)

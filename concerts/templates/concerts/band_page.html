@@ -12,6 +12,9 @@ body { max-width: 60rem; margin: 0 auto; padding: 1rem; }
 h1 { margin: 0; }
 footer { opacity: .7; }
 .unclaimed { font-size: .9em; opacity: .8; }
+.past { margin: 1.5rem 0; }
+.past summary { cursor: pointer; }
+.past ul { padding-left: 1.2rem; }
 </style>
 {% for event in events %}
 <script type="application/ld+json">{{ event }}</script>
@@ -26,6 +29,13 @@ footer { opacity: .7; }
 {% include "concerts/_concert_list.html" %}
 {% else %}
 <p>No upcoming concerts.</p>
+{% endif %}
+{% if past %}
+<details class="past"><summary>Past shows ({{ past|length }})</summary>
+<ul>
+{% for concert in past %}<li><time datetime="{{ concert.starts_at|date:'Y-m-d' }}">{{ concert.starts_at|date:"j M Y" }}</time> · {% include "concerts/_venue.html" %}{% if concert.event %} ({{ concert.venue.name }}){% endif %}, {{ concert.venue.city }}{% if concert.other_band_links %} · <span class="muted">with {% for name, url in concert.other_band_links %}{% if url %}<a href="{{ url }}">{{ name }}</a>{% else %}{{ name }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% endif %}</li>
+{% endfor %}</ul>
+</details>
 {% endif %}
 {% if links %}
 <footer><p>{% for url, label in links %}<a href="{{ url }}" rel="{% if claimed %}me {% endif %}noopener">{{ label }}</a>{% if not forloop.last %} · {% endif %}{% endfor %}</p></footer>
