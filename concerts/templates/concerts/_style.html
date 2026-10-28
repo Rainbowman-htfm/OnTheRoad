@@ -31,6 +31,15 @@ a { color: inherit; }
 .status-cancelled { color: var(--cancelled); font-weight: 600; }
 .new { font-size: .7em; font-weight: 600; text-transform: uppercase; color: var(--accent); border: 1px solid var(--accent); border-radius: var(--radius); padding: 0 .3em; vertical-align: .15em; }
 .credit { font-size: .75em; opacity: .7; }
+/* "Add to my calendar": the choices float over the page rather than pushing it down */
+.calendar { display: inline-block; position: relative; }
+.calendar summary { cursor: pointer; text-decoration: underline; list-style: none; }
+.calendar summary::-webkit-details-marker { display: none; }
+/* The arrow with an empty alternative, so screen readers do not read "down-pointing triangle" */
+.calendar summary::after { content: " ▾"; content: " ▾" / ""; }
+.calendar ul { position: absolute; z-index: 1; left: 0; top: 100%; margin: .3rem 0 0; padding: .5rem .8rem; list-style: none; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 2px 8px rgba(0, 0, 0, .15); white-space: nowrap; }
+.calendar li { padding: .25rem 0; }
+.calendar input { display: block; width: 16rem; margin-top: .2rem; font: inherit; font-size: .85em; }
 /* The venue of a named event, on its own line under the event's name: secondary */
 .at { display: block; font-size: .85em; font-weight: normal; opacity: .7; }
 .moved { display: block; font-size: .85em; font-weight: 600; color: var(--accent); }
@@ -38,7 +47,7 @@ a { color: inherit; }
    bands share what is left, about 11rem each at full width; minmax(0, …) lets them shrink rather than push
    the row wider, so every row keeps the same columns */
 @media (min-width: 900px) {
-  .info { display: grid; grid-template-columns: minmax(0, 1fr) 9rem 8rem minmax(0, 1fr) 4rem; align-items: center; gap: .8rem; }
+  .concert .info { display: grid; grid-template-columns: minmax(0, 1fr) 9rem 8rem minmax(0, 1fr) 4rem; align-items: center; gap: .8rem; }
   .venue { display: inline; }
   .details { display: contents; opacity: 1; }
   .details span { opacity: .7; }

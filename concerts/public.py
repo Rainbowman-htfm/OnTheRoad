@@ -79,9 +79,19 @@ def osm_credit(concerts: list[Concert]) -> str:
     return "all" if from_osm and all(from_osm) else "some" if any(from_osm) else ""
 
 
-def calendar_url(band: Band) -> str:
-    # webcal:// opens the phone's calendar app to subscribe, rather than downloading the file once
-    return "webcal://" + page_url(band).split("://", 1)[1] + "concerts.ics"
+def calendar_links(band: Band) -> dict[str, str]:
+    """Ways to subscribe to the band's calendar: the site cannot know which calendar a fan uses."""
+    feed = page_url(band) + "concerts.ics"
+    # webcal:// opens the calendar app to subscribe, rather than downloading the file once; Android has no app
+    # for it, so Google and Outlook get their own subscription pages, with the feed filled in
+    webcal = "webcal://" + feed.split("://", 1)[1]
+    return {
+        "apple": webcal,
+        "google": "https://calendar.google.com/calendar/r?" + urlencode({"cid": webcal}),
+        "outlook": "https://outlook.live.com/calendar/0/addfromweb?" + urlencode({"url": feed, "name": band.name}),
+        "feed": feed,
+        "band": band.name,  # for screen readers: which band's "Add to my calendar", on the home page
+    }
 
 
 def monogram(band: Band) -> dict[str, Any]:
@@ -293,7 +303,7 @@ def band_page(band: Band, concerts: list[Concert], band_links: list[str], claime
             "past": past,
             "events": [json_for_script(music_event(concert, band_links)) for concert in concerts],
             "links": [(url, link_label(url)) for url in links],
-            "calendar_url": calendar_url(band),
+            "calendar": calendar_links(band),
             "style": band_style(band),
             "new_since": new_since(),
             "osm_credit": osm_credit(concerts + past),
@@ -489,7 +499,7 @@ def home_bands() -> list[dict[str, Any]]:
             "band": band,
             "next": next_concert.get(band.pk),
             "monogram": monogram(band),
-            "calendar_url": calendar_url(band),
+            "calendar": calendar_links(band),
         }
         for band in Band.objects.all()
     ]

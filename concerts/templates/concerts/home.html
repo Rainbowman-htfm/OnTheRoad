@@ -16,6 +16,12 @@ h2 { margin-top: 2rem; }
 .bands li { display: flex; align-items: center; gap: .8rem; }
 .bands .name { display: block; font-weight: 700; }
 .bands .add { flex: none; font-size: .9em; }
+.bands .calendar ul { left: auto; right: 0; }  /* the button is at the right edge */
+.bands .info { flex: 1; }
+/* Wide screens: the next shows in a column, easy to compare from one band to the next */
+@media (min-width: 900px) {
+  .bands .info { display: grid; grid-template-columns: 14rem 1fr; gap: .8rem; align-items: center; }
+}
 /* Monogram: the band's initials, no image to load; white on a mid-dark colour reads well */
 .mono { width: 2.6rem; height: 2.6rem; flex: none; display: grid; place-items: center; border-radius: 50%; font-weight: 700; color: #fff; }
 .principles li { margin-bottom: .4rem; }
@@ -43,7 +49,7 @@ footer { margin-top: 2rem; font-size: .9em; }
     <a class="name" href="{{ item.band.slug }}/">{{ item.band.name }}</a>
     <span class="muted">{% with concert=item.next %}{% if concert %}Next show: {{ concert.starts_at|date:"D j M" }} · {% include "concerts/_venue.html" %}, {{ concert.venue.city }}{% else %}No upcoming shows{% endif %}{% endwith %}</span>
   </span>
-  <a class="add" href="{{ item.calendar_url }}">Add to my calendar</a>
+  <span class="add">{% include "concerts/_calendar_menu.html" with calendar=item.calendar %}</span>
 </li>
 {% endfor %}</ul>
 {% else %}

@@ -2,6 +2,7 @@ import gzip
 import json
 import re
 from datetime import timedelta
+from urllib.parse import urlencode
 
 import pytest
 from django.db import IntegrityError, transaction
@@ -170,6 +171,21 @@ def test_home_page_bands_sorted_by_next_show(band, venue, public_dir):
     assert "No upcoming shows" in home and "Next show: " in home
     assert public.monogram(Band(name="Faith In Agony", slug="faith-in-agony"))["initials"] == "FA"
     assert 'href="webcal://' in home
+
+
+def test_calendar_choices(band):
+    links = public.calendar_links(band)
+    feed = public.page_url(band) + "concerts.ics"
+    assert links["feed"] == feed
+    assert links["apple"] == "webcal://" + feed.split("://")[1]
+    assert links["google"] == "https://calendar.google.com/calendar/r?" + urlencode({"cid": links["apple"]})
+    assert links["outlook"] == "https://outlook.live.com/calendar/0/addfromweb?" + urlencode(
+        {"url": feed, "name": "Damantra"}
+    )
+    html = page(band)
+    assert all(f'href="{links[key]}"'.replace("&", "&amp;") in html for key in ("apple", "google", "outlook"))
+    assert f'value="{feed}"' in html  # to copy into any other app
+    assert 'Add to my calendar<span class="sr">: Damantra</span>' in html  # which band, for screen readers
 
 
 def test_home_page_contact_only_when_configured(band, public_dir, settings):
