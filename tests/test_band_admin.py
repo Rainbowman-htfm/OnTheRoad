@@ -84,4 +84,4 @@ def test_saving_marks_the_dates_checked(admin_client, settings, django_capture_o
     band.refresh_from_db()
     assert band.checked_at and timezone.now() - band.checked_at < timedelta(minutes=1)
     page = (settings.PUBLIC_DIR / "damantra" / "index.html").read_text()
-    assert f"Dates checked on {timezone.localdate():%-d %b %Y} · " in page
+    assert f"Dates checked on {timezone.localdate():%-d %b %Y}</p>" in page
