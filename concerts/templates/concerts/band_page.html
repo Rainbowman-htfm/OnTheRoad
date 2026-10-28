@@ -25,7 +25,7 @@ footer { opacity: .7; }
 {% if not claimed %}<p class="unclaimed">This page is maintained by On the Road, not by the band.{% if unclaimed_links.claim %} Are you in this band? <a href="{{ unclaimed_links.claim }}">Claim this page</a>.{% endif %}</p>{% endif %}
 <p class="muted">Upcoming concerts{% if band.checked_at %} · Dates checked on {{ band.checked_at|date:"j M Y" }}{% endif %} · Subscribe: <a href="{{ calendar_url }}">calendar</a> · <a href="concerts.xml">RSS</a></p>
 {% if concerts %}
-<p><button class="near" id="near" type="button" hidden>📍 Near me</button> <span id="near-message" class="muted"></span></p>
+<p><button class="near" id="near" type="button" hidden><span aria-hidden="true">📍</span> Near me</button> <span id="near-message" class="muted" aria-live="polite"></span></p>
 {% include "concerts/_concert_list.html" %}
 {% else %}
 <p>No upcoming concerts.</p>

@@ -1,11 +1,14 @@
 <style>
 /* Shared by the band page and the widget; the widget changes the variables from its settings */
-:root { --bg: #fff; --fg: #111; --line: rgba(127, 127, 127, .25); --accent: #111; --on-accent: #fff; --radius: 6px; --font: system-ui, sans-serif; --pad: .7rem; }
-:root[data-theme="dark"] { --bg: #161616; --fg: #eee; --accent: #eee; --on-accent: #111; }
+:root { --bg: #fff; --fg: #111; --line: rgba(127, 127, 127, .25); --accent: #111; --on-accent: #fff; --radius: 6px; --font: system-ui, sans-serif; --pad: .7rem; --cancelled: #c22; }
+/* A lighter red on dark: #c22 would be under the 4.5:1 contrast text needs */
+:root[data-theme="dark"] { --bg: #161616; --fg: #eee; --accent: #eee; --on-accent: #111; --cancelled: #f66; }
 :root[data-theme="transparent"] { --bg: transparent; }
 :root.compact { --pad: .35rem; }
 body { font-family: var(--font); color: var(--fg); background: var(--bg); line-height: 1.4; }
 [hidden] { display: none !important; }
+/* Read by screen readers only: which concert a ticket link is for, among many */
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 a { color: inherit; }
 .muted, .details, .tile .m { opacity: .7; }
 .near { font: inherit; color: var(--accent); background: none; border: 1px solid var(--accent); border-radius: var(--radius); padding: .25rem .7rem; cursor: pointer; }
@@ -23,8 +26,9 @@ a { color: inherit; }
 .entry { font-size: .85em; white-space: nowrap; }
 .entry a { display: block; }
 .tickets { display: inline-block; background: var(--accent); color: var(--on-accent); border-radius: var(--radius); padding: .3rem .8rem; text-decoration: none; }
-.cancelled .venue, .cancelled .details { text-decoration: line-through; opacity: .5; }
-.status-cancelled { color: #c22; font-weight: 600; }
+/* Dimmed, but still readable: at .5 the text fell under 4.5:1 */
+.cancelled .venue, .cancelled .details { text-decoration: line-through; opacity: .6; }
+.status-cancelled { color: var(--cancelled); font-weight: 600; }
 .new { font-size: .7em; font-weight: 600; text-transform: uppercase; color: var(--accent); border: 1px solid var(--accent); border-radius: var(--radius); padding: 0 .3em; vertical-align: .15em; }
 .credit { font-size: .75em; opacity: .7; }
 /* The venue of a named event, on its own line under the event's name: secondary */
@@ -38,6 +42,7 @@ a { color: inherit; }
   .venue { display: inline; }
   .details { display: contents; opacity: 1; }
   .details span { opacity: .7; }
+  .cancelled .details span { opacity: 1; }  /* already dimmed by its row: not twice */
   .details span::before { content: none !important; }
   .action { width: 8rem; text-align: right; }
 }
