@@ -52,7 +52,7 @@ body { margin: 0; padding: .25rem .75rem; }
 </head>
 <body>
 {% if concerts %}
-<p><button class="near" id="near" type="button" hidden>📍 Near me</button> <span id="near-message" class="muted"></span></p>
+<p><button class="near" id="near" type="button" hidden><span aria-hidden="true">📍</span> Near me</button> <span id="near-message" class="muted" aria-live="polite"></span></p>
 {% include "concerts/_concert_list.html" with new_tab=True %}
 {% else %}
 <p class="muted">No upcoming concerts.</p>

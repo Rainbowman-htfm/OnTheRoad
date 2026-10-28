@@ -219,7 +219,7 @@ def test_free_entry_shown_when_there_is_no_ticket_link(site, band, venue):
     free.ticket_url = "https://venue.example/event"
     free.save()
     page = built(site, band, "index.html")
-    assert 'Free entry<a href="https://venue.example/event" rel="noopener">Details</a>' in page
+    assert 'Free entry<a href="https://venue.example/event" rel="noopener">Details<span class="sr">' in page
     assert "Tickets" not in page
     assert public.music_event(free, [])["url"] == "https://venue.example/event"
     assert "offers" not in public.music_event(free, [])
@@ -310,3 +310,9 @@ def test_site_events_json_lists_every_band_for_tools(site, band, venue, settings
     assert events[0]["announced_at"] == timezone.localtime(sooner.announced_at).isoformat()
     # The same schema.org event as the band's own events.json
     assert events[1]["event"] in json.loads((site / "damantra" / "events.json").read_text())
+
+
+def test_screen_readers_hear_which_concert_a_ticket_link_is_for(site, band, venue):
+    concert = add_concert(band, venue, days=3, ticket_url="https://tickets.example/1")
+    page = built(site, band, "index.html")
+    assert f'Tickets<span class="sr">, Le Plan, {timezone.localtime(concert.starts_at):%-d %b}</span></a>' in page

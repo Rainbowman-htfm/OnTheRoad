@@ -1,7 +1,7 @@
 <ul class="concerts" id="concerts">
 {% for concert in concerts %}
 <li class="concert{% if concert.status == 'cancelled' %} cancelled{% endif %}"{% if concert.venue.latitude is not None and concert.venue.longitude is not None %} data-lat="{{ concert.venue.latitude|stringformat:'f' }}" data-lon="{{ concert.venue.longitude|stringformat:'f' }}"{% endif %}>
-  <time class="tile" datetime="{% if concert.time_tba %}{{ concert.starts_at|date:'Y-m-d' }}{% else %}{{ concert.starts_at|date:'c' }}{% endif %}"><span class="d">{{ concert.starts_at|date:"j" }}</span><span class="m">{{ concert.starts_at|date:"M" }}</span></time>
+  <time class="tile" datetime="{% if concert.time_tba %}{{ concert.starts_at|date:'Y-m-d' }}{% else %}{{ concert.starts_at|date:'c' }}{% endif %}"><span class="d">{{ concert.starts_at|date:"j" }}</span> <span class="m">{{ concert.starts_at|date:"M" }}</span></time>
   <div class="info">
     <strong class="venue">{% include "concerts/_venue.html" %}{% if new_since and concert.announced_at >= new_since and concert.status != "cancelled" %} <span class="new">New</span>{% endif %}{% if concert.event %} <span class="at">{{ concert.venue.name }}</span>{% endif %}{% if concert.previous_starts_at %} <span class="moved">Rescheduled · was {{ concert.previous_starts_at|date:"M j" }}</span>{% endif %}</strong>
     <span class="details"><span>{{ concert.venue.city }}</span><span class="time">{% if concert.time_tba %}{{ concert.starts_at|date:"D" }}, time TBA{% else %}{{ concert.starts_at|date:"D H:i" }}{% endif %}</span><span>{% if concert.other_band_links %}with {% for name, url in concert.other_band_links %}{% if url %}<a href="{{ url }}"{% if new_tab %} target="_blank"{% endif %}>{{ name }}</a>{% else %}{{ name }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}{% endif %}</span><span class="km"></span></span>
@@ -9,8 +9,8 @@
   <div class="action">
     {% if concert.status == "cancelled" %}<span class="status-cancelled">Cancelled</span>
     {% elif concert.status == "sold_out" %}<span class="muted">Sold out</span>
-    {% elif concert.entry != "tickets" %}<span class="muted entry">{{ concert.get_entry_display|capfirst }}{% if concert.ticket_url %}<a href="{{ concert.ticket_url }}"{% if new_tab %} target="_blank"{% endif %} rel="noopener">Details</a>{% endif %}</span>
-    {% elif concert.ticket_url %}<a class="tickets" href="{{ concert.ticket_url }}"{% if new_tab %} target="_blank"{% endif %} rel="noopener">Tickets</a>{% endif %}
+    {% elif concert.entry != "tickets" %}<span class="muted entry">{{ concert.get_entry_display|capfirst }}{% if concert.ticket_url %}<a href="{{ concert.ticket_url }}"{% if new_tab %} target="_blank"{% endif %} rel="noopener">Details<span class="sr">, {% firstof concert.event.name concert.venue.name %}, {{ concert.starts_at|date:"j M" }}</span></a>{% endif %}</span>
+    {% elif concert.ticket_url %}<a class="tickets" href="{{ concert.ticket_url }}"{% if new_tab %} target="_blank"{% endif %} rel="noopener">Tickets<span class="sr">, {% firstof concert.event.name concert.venue.name %}, {{ concert.starts_at|date:"j M" }}</span></a>{% endif %}
   </div>
 </li>
 {% endfor %}
