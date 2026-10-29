@@ -55,10 +55,10 @@ Run `manage.py build` every night: it rebuilds all public pages, so "upcoming" s
 ## Building over the data
 
 `/events.json` lists every upcoming concert of every band, each with a permanent identifier, for tools built
-over an instance. `integrations/mastodon_bot.py` is one: a Mastodon account announcing the new dates, one post
+over an instance. `integrations/bot.py` is one: Mastodon and Bluesky accounts announcing the new dates, one post
 per band, and replying when a date is cancelled or moved. It only reads `/events.json`, so it can follow any
-instance. Run it every 15 minutes; its settings are at the top of the file, and without `MASTODON_TOKEN` it
-only prints what it would post.
+instance. Run it every 15 minutes for each network (`python integrations/bot.py mastodon`, then `bluesky`); its
+settings are at the top of the file, and without a token or app password it only prints what it would post.
 
 ## Development
 
