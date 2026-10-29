@@ -83,6 +83,8 @@ footer { margin-top: 2rem; font-size: .9em; }
 
 {% include "concerts/_osm_credit.html" %}
 <footer class="muted">
+{# rel="me": Mastodon checks this link to show the site as verified on the account's profile #}
+{% if mastodon or bluesky %}<p>New dates as they're announced: {% if mastodon %}<a rel="me" href="{{ mastodon }}">Mastodon</a>{% endif %}{% if mastodon and bluesky %} · {% endif %}{% if bluesky %}<a href="{{ bluesky }}">Bluesky</a>{% endif %}</p>{% endif %}
 <p>{% if contact %}<a href="mailto:{{ contact }}">Contact</a> · {% endif %}<a href="data.html">Your data</a> · <a href="{{ source }}">Source code</a> (AGPL-3.0) · No cookies on public pages, no analytics.</p>
 </footer>
 </body>

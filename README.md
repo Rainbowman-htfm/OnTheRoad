@@ -48,6 +48,7 @@ Everything is read from environment variables, or from a `.env` file next to `ma
 | `CONTACT_EMAIL` | Contact shown on the home page, and sent to MusicBrainz and OpenStreetMap with each request |
 | `EMAIL_HOST`, `EMAIL_PORT`, `EMAIL_USER`, `EMAIL_PASSWORD` | SMTP server for login links; without it, emails are printed in the console |
 | `SOURCE_URL` | Where the code this instance runs can be read (the AGPL asks for it); defaults to this repository |
+| `MASTODON_PROFILE`, `BLUESKY_PROFILE` | The instance's accounts announcing new dates, linked from the home page (with `rel="me"`, so Mastodon shows the site as verified); empty: no link |
 | `SERVE_FILES` | `1` to let Django serve the public pages, when no web server does it |
 
 Run `manage.py build` every night: it rebuilds all public pages, so "upcoming" stays accurate.

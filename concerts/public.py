@@ -522,6 +522,8 @@ def build_home() -> None:
             "osm_credit": osm_credit(shown),
             "contact": settings.CONTACT_EMAIL,
             "source": settings.SOURCE_URL,
+            "mastodon": settings.MASTODON_PROFILE,
+            "bluesky": settings.BLUESKY_PROFILE,
             "suggest": mailto(
                 "Suggest a band",
                 "Band:\nCity:\nOfficial link (website, Instagram…):\n\n"

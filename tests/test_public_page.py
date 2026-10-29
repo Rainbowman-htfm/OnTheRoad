@@ -197,6 +197,21 @@ def test_home_page_contact_only_when_configured(band, public_dir, settings):
     assert (public_dir / "index.html").read_text().count('href="mailto:contact@example.org"') == 2
 
 
+def test_home_page_links_the_accounts_only_when_configured(public_dir, settings):
+    settings.MASTODON_PROFILE = settings.BLUESKY_PROFILE = ""
+    public.build_home()
+    assert "Mastodon" not in (public_dir / "index.html").read_text()
+    settings.MASTODON_PROFILE = "https://mastodon.example/@dates"
+    public.build_home()
+    assert (
+        '<a rel="me" href="https://mastodon.example/@dates">Mastodon</a></p>' in (public_dir / "index.html").read_text()
+    )
+    settings.BLUESKY_PROFILE = "https://bsky.app/profile/dates.example"
+    public.build_home()
+    page = (public_dir / "index.html").read_text()
+    assert 'Mastodon</a> · <a href="https://bsky.app/profile/dates.example">Bluesky</a>' in page
+
+
 def test_your_data_page_is_linked_and_kept_by_the_nightly_build(band, public_dir):
     public.build_all()
     page = (public_dir / "data.html").read_text()
