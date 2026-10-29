@@ -190,5 +190,10 @@ CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "")
 # points this to its own copy
 SOURCE_URL = os.environ.get("SOURCE_URL", "https://github.com/Rainbowman-htfm/OnTheRoad")
 
+# The instance's own accounts, which announce the new dates (integrations/bot.py), linked from the home page.
+# Empty: no link
+MASTODON_PROFILE = os.environ.get("MASTODON_PROFILE", "")
+BLUESKY_PROFILE = os.environ.get("BLUESKY_PROFILE", "")
+
 # Login links sent by email: valid for 30 minutes, and only once (see concerts/login.py)
 PASSWORD_RESET_TIMEOUT = 30 * 60
