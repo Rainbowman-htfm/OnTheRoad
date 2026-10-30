@@ -11,7 +11,7 @@ from django.utils import timezone
 from icalendar import Calendar
 
 from concerts import public
-from concerts.models import Account, Band, Concert, Membership, Venue
+from concerts.models import Account, Band, Concert, Genre, Membership, Venue
 
 pytestmark = pytest.mark.django_db
 
@@ -290,6 +290,7 @@ def test_every_json_ld_block_on_the_page_is_a_complete_music_event(site, band, v
 def test_site_events_json_lists_every_band_for_tools(site, band, venue, settings):
     settings.SITE_URL = "https://dates.example"
     splenius = Band.objects.create(name="Splenius", slug="splenius")
+    splenius.genres.add(Genre.objects.create(name="Punk", slug="punk"), Genre.objects.create(name="Rock", slug="rock"))
     Membership.objects.create(account=Account.objects.create_user("member@example.org"), band=splenius)
     add_concert(band, venue, days=-2)  # past: left out
     later = add_concert(band, venue, days=9, status=Concert.Status.CANCELLED)  # cancelled: kept, so tools see it
@@ -301,8 +302,13 @@ def test_site_events_json_lists_every_band_for_tools(site, band, venue, settings
     assert [entry["event"]["identifier"] for entry in events] == [
         f"concert-{concert.pk}@dates.example" for concert in (sooner, later)
     ]  # soonest first, the calendars' UID
-    assert events[0]["band"] == {"name": "Splenius", "page": "https://dates.example/splenius/", "claimed": True}
-    assert events[1]["band"]["claimed"] is False
+    assert events[0]["band"] == {
+        "name": "Splenius",
+        "page": "https://dates.example/splenius/",
+        "claimed": True,
+        "genres": ["Punk", "Rock"],
+    }
+    assert events[1]["band"]["claimed"] is False and events[1]["band"]["genres"] == []
     assert events[0]["other_bands"] == [
         {"name": "Damantra", "page": "https://dates.example/damantra/"},
         {"name": "Novelists", "page": ""},

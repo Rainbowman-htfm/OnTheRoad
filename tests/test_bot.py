@@ -95,6 +95,15 @@ def test_hashtags_one_per_city_without_accents_or_dashes():
     assert text.endswith("\n\n#concert #MADAM #Orleans #Paris")
 
 
+def test_genres_as_hashtags_after_the_band():
+    bot = Fake()
+    bot.run([])
+    entry = concert(1)
+    entry["band"]["genres"] = ["Metal", "Post-rock"]
+    [(text, _)] = bot.run([entry])
+    assert text.endswith("\n\n#concert #MADAM #Metal #PostRock #Orleans")
+
+
 def test_new_dates_one_post_per_band():
     bot = Fake()
     bot.run([])

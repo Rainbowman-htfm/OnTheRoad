@@ -1,5 +1,5 @@
 """Static public files for each band, written to settings.PUBLIC_DIR/<slug>/:
-page, widget, iCal and RSS feeds, and the MusicEvent data as JSON."""
+page, widget, iCal and RSS feeds, and the MusicEvent data as JSON; and each genre's, in genre/<slug>/."""
 
 import json
 import re
@@ -17,7 +17,7 @@ from django.utils.feedgenerator import Rss201rev2Feed
 from django.utils.safestring import SafeString, mark_safe
 from icalendar import Calendar, Event
 
-from .models import Band, Concert, Membership
+from .models import RESERVED_SLUGS, Band, Concert, Genre, Membership
 
 EVENT_STATUS: dict[str, str] = {
     Concert.Status.PLANNED: "EventScheduled",
@@ -72,6 +72,10 @@ def page_url(band: Band) -> str:
     return f"{site_url()}/{band.slug}/"
 
 
+def genre_url(genre: Genre) -> str:
+    return f"{site_url()}/genre/{genre.slug}/"
+
+
 def osm_credit(concerts: list[Concert]) -> str:
     """OpenStreetMap's licence (ODbL) asks for a credit wherever its data is shown: "all" when every venue on
     the page was imported from it, "some" when only some were, "" when none."""
@@ -79,18 +83,19 @@ def osm_credit(concerts: list[Concert]) -> str:
     return "all" if from_osm and all(from_osm) else "some" if any(from_osm) else ""
 
 
-def calendar_links(band: Band) -> dict[str, str]:
-    """Ways to subscribe to the band's calendar: the site cannot know which calendar a fan uses."""
-    feed = page_url(band) + "concerts.ics"
+def calendar_links(page: str, name: str) -> dict[str, str]:
+    """Ways to subscribe to a band's or a genre's calendar, next to its page: the site cannot know which
+    calendar a fan uses."""
+    feed = page + "concerts.ics"
     # webcal:// opens the calendar app to subscribe, rather than downloading the file once; Android has no app
     # for it, so Google and Outlook get their own subscription pages, with the feed filled in
     webcal = "webcal://" + feed.split("://", 1)[1]
     return {
         "apple": webcal,
         "google": "https://calendar.google.com/calendar/r?" + urlencode({"cid": webcal}),
-        "outlook": "https://outlook.live.com/calendar/0/addfromweb?" + urlencode({"url": feed, "name": band.name}),
+        "outlook": "https://outlook.live.com/calendar/0/addfromweb?" + urlencode({"url": feed, "name": name}),
         "feed": feed,
-        "band": band.name,  # for screen readers: which band's "Add to my calendar", on the home page
+        "name": name,  # for screen readers: which band's "Add to my calendar", on the home page
     }
 
 
@@ -303,7 +308,8 @@ def band_page(band: Band, concerts: list[Concert], band_links: list[str], claime
             "past": past,
             "events": [json_for_script(music_event(concert, band_links)) for concert in concerts],
             "links": [(url, link_label(url)) for url in links],
-            "calendar": calendar_links(band),
+            "calendar": calendar_links(page_url(band), band.name),
+            "genres": list(band.genres.all()),
             "style": band_style(band),
             "new_since": new_since(),
             "osm_credit": osm_credit(concerts + past),
@@ -366,16 +372,17 @@ def feed_text(concert: Concert, claimed: bool) -> str:
     return "\n".join(part for part in (describe(concert), "" if claimed else UNCLAIMED_NOTE) if part)
 
 
-def calendar(band: Band, claimed: bool) -> bytes:
-    """iCal feed. Past concerts stay in it: a subscribed calendar drops whatever leaves the feed."""
+def calendar(name: str, concerts: QuerySet[Concert], claimed: set[int]) -> bytes:
+    """iCal feed of a band's or a genre's concerts. Past concerts stay in it: a subscribed calendar drops
+    whatever leaves the feed. claimed: the bands managing their page, as from claimed_band_ids()."""
     # ponytail: every past concert, so the file grows ~400 bytes per concert and calendars re-download it
     # every few hours; keep only the last 12 months or so once bands have hundreds of concerts
     cal = Calendar()
     cal.add("prodid", "-//OTR//concert dates//EN")
     cal.add("version", "2.0")
-    cal.add("x-wr-calname", f"{band.name} concerts")
+    cal.add("x-wr-calname", f"{name} concerts")
     now = timezone.now()
-    for concert in band.concerts.select_related("venue", "event").prefetch_related(OTHER_BANDS):
+    for concert in concerts.select_related("band", "venue", "event").prefetch_related(OTHER_BANDS):
         venue = concert.venue
         event = Event()
         event.add("uid", concert_uid(concert))
@@ -389,26 +396,33 @@ def calendar(band: Band, claimed: bool) -> bytes:
             event.add("dtstart", concert.starts_at)
             if concert.ends_at:
                 event.add("dtend", concert.ends_at)
-        event.add("summary", f"{band.name} at {(concert.event or venue).name}")
+        event.add("summary", f"{concert.band.name} at {(concert.event or venue).name}")
         city = f"{venue.postal_code} {venue.city}".strip()
         event.add("location", ", ".join(part for part in (venue.name, venue.address, city) if part))
         event.add("status", ICAL_STATUS[concert.status])
         if concert.ticket_url:
             event.add("url", concert.ticket_url)
-        if description := feed_text(concert, claimed):
+        if description := feed_text(concert, concert.band_id in claimed):
             event.add("description", description)
         cal.add_component(event)
     return cal.to_ical()
 
 
-def rss(concerts: list[Concert], claimed: set[int], band: Band | None = None) -> str:
-    """RSS feed of upcoming concerts, latest announcements first: one band's, or the whole site's
-    recent announcements (band=None), whose items start with the band's name. claimed: claimed_band_ids()."""
+def rss(concerts: list[Concert], claimed: set[int], band: Band | None = None, genre: Genre | None = None) -> str:
+    """RSS feed of upcoming concerts, latest announcements first: one band's, one genre's, or the whole
+    site's recent announcements; but for a band's, items start with the band's name. claimed: claimed_band_ids()."""
     if band:
         feed = Rss201rev2Feed(
             title=f"{band.name} – upcoming concerts",
             link=page_url(band),
             description=f"Upcoming concerts of {band.name}",
+            language="en",
+        )
+    elif genre:
+        feed = Rss201rev2Feed(
+            title=f"{genre.name} – upcoming concerts",
+            link=genre_url(genre),
+            description=f"Upcoming concerts of the {genre.name} bands on this site",
             language="en",
         )
     else:
@@ -438,11 +452,12 @@ def rss(concerts: list[Concert], claimed: set[int], band: Band | None = None) ->
 def site_events() -> list[dict[str, Any]]:
     """Every upcoming concert of every band, soonest first, for tools built over the site (a Mastodon bot, a
     town's agenda): the schema.org MusicEvent, as in each band's events.json, and what schema.org has no
-    place for: the band's page, whether it manages it, when the date was announced, the other bands' pages."""
+    place for: the band's page and genres, whether it manages its page, when the date was announced, the
+    other bands' pages."""
     concerts = (
         Concert.objects.filter(starts_at__gte=start_of_today())
         .select_related("band", "venue", "event")
-        .prefetch_related(OTHER_BANDS, "band__links")
+        .prefetch_related(OTHER_BANDS, "band__links", "band__genres")
         .order_by("starts_at", "pk")
     )
     claimed = claimed_band_ids()
@@ -452,6 +467,7 @@ def site_events() -> list[dict[str, Any]]:
                 "name": concert.band.name,
                 "page": page_url(concert.band),
                 "claimed": concert.band_id in claimed,
+                "genres": [genre.name for genre in concert.band.genres.all()],
             },
             "announced_at": timezone.localtime(concert.announced_at).isoformat(),
             "other_bands": [
@@ -467,16 +483,16 @@ def build_band(band: Band) -> None:
     concerts = list(upcoming_concerts(band))
     # The band's links are loaded once, not once per concert
     band_links = [link.url for link in band.links.all()]
-    claimed = band.members.exists()
+    claimed = {band.pk} if band.members.exists() else set()  # as claimed_band_ids(), for calendar() and rss()
     events = [music_event(concert, band_links) for concert in concerts]
     folder = settings.PUBLIC_DIR / band.slug
     (folder / "widget").mkdir(parents=True, exist_ok=True)
-    (folder / "index.html").write_text(band_page(band, concerts, band_links, claimed), encoding="utf-8")
+    (folder / "index.html").write_text(band_page(band, concerts, band_links, bool(claimed)), encoding="utf-8")
     (folder / "widget" / "index.html").write_text(widget_page(band, concerts), encoding="utf-8")
     # Same MusicEvent data as the page, for the band's own website (embed code)
     (folder / "events.json").write_text(json_for_script(events), encoding="utf-8")
-    (folder / "concerts.ics").write_bytes(calendar(band, claimed))
-    (folder / "concerts.xml").write_text(rss(concerts, {band.pk} if claimed else set(), band), encoding="utf-8")
+    (folder / "concerts.ics").write_bytes(calendar(band.name, band.concerts.all(), claimed))
+    (folder / "concerts.xml").write_text(rss(concerts, claimed, band), encoding="utf-8")
 
 
 def remove_band(slug: str) -> None:
@@ -499,7 +515,7 @@ def home_bands() -> list[dict[str, Any]]:
             "band": band,
             "next": next_concert.get(band.pk),
             "monogram": monogram(band),
-            "calendar": calendar_links(band),
+            "calendar": calendar_links(page_url(band), band.name),
         }
         for band in Band.objects.all()
     ]
@@ -507,9 +523,49 @@ def home_bands() -> list[dict[str, Any]]:
     return sorted(bands, key=lambda item: (item["next"] is None, item["next"].starts_at if item["next"] else 0))
 
 
+def build_genres() -> None:
+    """Each genre's page, with the upcoming concerts of its bands, and its iCal and RSS feeds, in genre/<slug>/;
+    the folders of deleted or renamed genres go."""
+    claimed = claimed_band_ids()
+    slugs: set[str] = set()
+    # ponytail: every genre at every save, a few queries each; only the changed bands' genres if they grow many
+    # A genre without bands has no page: its folder goes, like a deleted genre's
+    for genre in Genre.objects.filter(bands__isnull=False).distinct().prefetch_related("bands"):
+        slugs.add(genre.slug)
+        concerts = Concert.objects.filter(band__genres=genre)
+        upcoming = list(
+            concerts.filter(starts_at__gte=start_of_today())
+            .select_related("band", "venue", "event")
+            .prefetch_related(OTHER_BANDS)
+            .order_by("starts_at")
+        )
+        link_other_bands(upcoming)
+        folder = settings.PUBLIC_DIR / "genre" / genre.slug
+        folder.mkdir(parents=True, exist_ok=True)
+        html = render_to_string(
+            "concerts/genre.html",
+            {
+                "genre": genre,
+                "bands": genre.bands.all(),
+                "unclaimed": any(concert.band_id not in claimed for concert in upcoming),
+                "concerts": upcoming,
+                "calendar": calendar_links(genre_url(genre), genre.name),
+                "new_since": new_since(),
+                "osm_credit": osm_credit(upcoming),
+            },
+        )
+        (folder / "index.html").write_text(html, encoding="utf-8")
+        (folder / "concerts.ics").write_bytes(calendar(genre.name, concerts, claimed))
+        (folder / "concerts.xml").write_text(rss(upcoming, claimed, genre=genre), encoding="utf-8")
+    for folder in (settings.PUBLIC_DIR / "genre").glob("*/"):
+        if folder.name not in slugs:
+            shutil.rmtree(folder)
+
+
 def build_home() -> None:
     """Home page (just announced concerts, then the bands), the site's "just announced" feed and events.json,
-    the "Your data" page and the guide for bands, at the root of PUBLIC_DIR."""
+    the "Your data" page, the guide for bands, at the root of PUBLIC_DIR; and the genres' pages, as they list
+    concerts of several bands."""
     settings.PUBLIC_DIR.mkdir(parents=True, exist_ok=True)
     announced = list(just_announced())
     bands = home_bands()
@@ -518,6 +574,7 @@ def build_home() -> None:
         "concerts/home.html",
         {
             "bands": bands,
+            "genres": Genre.objects.filter(bands__isnull=False).distinct(),  # a genre without bands has no page
             "announced": announced_by_band(announced),
             "osm_credit": osm_credit(shown),
             "contact": settings.CONTACT_EMAIL,
@@ -548,6 +605,7 @@ def build_home() -> None:
         },
     )
     (settings.PUBLIC_DIR / "guide.html").write_text(guide, encoding="utf-8")
+    build_genres()
 
 
 def build_all() -> None:
@@ -558,5 +616,5 @@ def build_all() -> None:
         build_band(band)
         slugs.add(band.slug)
     for folder in settings.PUBLIC_DIR.iterdir():
-        if folder.is_dir() and folder.name not in slugs:
+        if folder.is_dir() and folder.name not in slugs | RESERVED_SLUGS:  # genre/ is the site's
             shutil.rmtree(folder)

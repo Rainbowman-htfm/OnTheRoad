@@ -3,7 +3,7 @@
 import pytest
 from django.contrib.auth.models import Group
 
-from concerts.models import Account, Band, Concert, Membership, Venue
+from concerts.models import Account, Band, Concert, Genre, Membership, Venue
 
 pytestmark = pytest.mark.django_db
 
@@ -103,6 +103,15 @@ def test_member_adds_venues_but_cannot_change_them(client, member, venue):
     assert client.get(f"/admin/concerts/venue/{venue.pk}/delete/").status_code == 403
 
 
+def test_member_ticks_genres_but_cannot_add_to_the_list(client, member, band):
+    Genre.objects.create(name="Metal", slug="metal")
+    page = client.get(f"/admin/concerts/band/{band.pk}/change/").content.decode()
+    assert '<input type="checkbox" name="genres"' in page and "Metal" in page
+    assert "/admin/concerts/genre/add/" not in page  # no "+" next to the genres
+    assert client.get("/admin/concerts/genre/").status_code == 403
+    assert client.get("/admin/concerts/genre/add/").status_code == 403
+
+
 def test_member_cannot_manage_accounts(client, member):
     assert client.get("/admin/concerts/account/").status_code == 403
 
@@ -112,7 +121,9 @@ def test_superuser_sees_every_band(client, band, other_band):
     page = client.get("/admin/concerts/band/").content.decode()
     assert "Damantra" in page and "Splenius" in page
     assert client.get(f"/admin/concerts/band/{other_band.pk}/share/").status_code == 200
-    assert 'name="slug"' in client.get(f"/admin/concerts/band/{band.pk}/change/").content.decode()
+    page = client.get(f"/admin/concerts/band/{band.pk}/change/").content.decode()
+    assert 'name="slug"' in page
+    assert "/admin/concerts/genre/add/" in page  # a genre added from the band's page
 
 
 def test_member_names_any_band_as_other_band(client, member, band, other_band, venue):

@@ -9,6 +9,7 @@ from django.contrib import admin, messages
 from django.contrib.admin.options import IS_POPUP_VAR, TO_FIELD_VAR
 from django.contrib.auth.admin import UserAdmin
 from django.core.exceptions import PermissionDenied
+from django.db import models
 from django.db.models import Q, QuerySet
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect
@@ -18,7 +19,7 @@ from django.utils import timezone
 from django.views.decorators.clickjacking import xframe_options_sameorigin
 
 from . import musicbrainz, openstreetmap, public, venue_search
-from .models import Account, Band, BandLink, Concert, Event, Membership, Venue, VenueLink
+from .models import Account, Band, BandLink, Concert, Event, Genre, Membership, Venue, VenueLink
 
 # "View site" in the admin, and the guide link on its home page: the public pages
 admin.site.site_url = public.site_url() + "/"
@@ -183,7 +184,9 @@ class BandAdmin(admin.ModelAdmin):
     search_fields = ["name"]
     prepopulated_fields = {"slug": ["name"]}
     inlines = [ConcertInline, BandLinkInline, MembershipInline]
-    fields = ["name", "slug", "musicbrainz_id", "website"]  # the style has its own page
+    fields = ["name", "slug", "genres", "musicbrainz_id", "website"]  # the style has its own page
+    # A few genres: all visible at once, ticked rather than picked from a list
+    formfield_overrides = {models.ManyToManyField: {"widget": forms.CheckboxSelectMultiple}}
 
     def get_queryset(self, request: HttpRequest) -> QuerySet[Band]:
         # Also used by the change, delete and autocomplete views: other bands are "not found"
@@ -419,6 +422,13 @@ class VenueAdmin(admin.ModelAdmin):
         if not self.has_view_permission(request, venue):
             raise PermissionDenied
         return popup_pick(request, venue)
+
+
+@admin.register(Genre)
+class GenreAdmin(admin.ModelAdmin):
+    # Only administrators: band members tick genres on their band, without adding to the list
+    list_display = ["name", "slug"]
+    prepopulated_fields = {"slug": ["name"]}
 
 
 @admin.register(Event)
