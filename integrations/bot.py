@@ -5,7 +5,9 @@ remembers what it posted in a small JSON file of its own, one per network.
 
 Run it every 15 minutes, once per network:  python integrations/bot.py mastodon
                                             python integrations/bot.py bluesky
-A network down does not hold up the other. Settings, from the environment or the .env file next to manage.py:
+A network down does not hold up the other. Once a week, the weekend's concerts, one post per genre:
+  python integrations/bot.py mastodon weekend   on Thursdays, hourly from 18:00 to 21:00
+A busy weekend is then spread over the runs; posted only once, whatever the number of runs. Settings, from the environment or the .env file next to manage.py:
   BOT_SITE_URL          the site to announce, "https://ontheroad.alwaysdata.net"
   MASTODON_URL          the bot's instance, "https://mastodon.example"
   MASTODON_TOKEN        its application's token (write:statuses only)
@@ -14,7 +16,7 @@ A network down does not hold up the other. Settings, from the environment or the
   BLUESKY_APP_PASSWORD  an app password (Settings > Privacy and security > App passwords), never the account's
   BLUESKY_URL           its server, "https://bsky.social" by default
 Without the token or the app password, posts are printed, not sent. What it posted: mastodon_bot.json and
-bluesky_bot.json next to manage.py.
+bluesky_bot.json next to manage.py, and mastodon_weekend.json and bluesky_weekend.json for the weekend.
 
 After moving the site to another domain, delete the state files: the concerts' identifiers contain the domain,
 so every date would look new. The next run then starts over, without announcing anything.
@@ -61,11 +63,16 @@ def when(event: dict[str, Any]) -> str:
     return f"{moment:%a} {moment.day} {moment:%b}, {moment:%H:%M}"
 
 
-def line(entry: Entry) -> str:
-    """ "Fri 14 Nov, 20:30 – Hellfest, Clisson": the event's name when it has one, as on the site."""
+def place(entry: Entry) -> str:
+    """ "Hellfest, Clisson": the event's name when it has one, as on the site."""
     event = entry["event"]
-    place = event.get("superEvent", {}).get("name") or event["location"]["name"]
-    return f"{when(event)} – {place}, {event['location']['address']['addressLocality']}"
+    name = event.get("superEvent", {}).get("name") or event["location"]["name"]
+    return f"{name}, {event['location']['address']['addressLocality']}"
+
+
+def line(entry: Entry) -> str:
+    """ "Fri 14 Nov, 20:30 – Hellfest, Clisson"."""
+    return f"{when(entry['event'])} – {place(entry)}"
 
 
 def hashtag(name: str) -> str:
@@ -201,6 +208,67 @@ def run(
     save(state)
 
 
+def weekend_posts(genre: str, entries: list[Entry], site: str, max_length: int) -> list[str]:
+    """One genre's concerts of the weekend: one post, or a thread when they do not fit."""
+
+    def compose(shown: list[Entry]) -> str:
+        cities = (entry["event"]["location"]["address"]["addressLocality"] for entry in shown)
+        tags = dict.fromkeys(["#concert", hashtag(genre), *(hashtag(city) for city in cities)])
+        lines = (f"{when(entry['event'])} – {entry['band']['name']} at {place(entry)}" for entry in shown)
+        title = f"{genre or 'Concerts'} this weekend"
+        return "\n".join([title, "", *lines, "", site + "/", "", " ".join(tag for tag in tags if tag)])
+
+    posts: list[str] = []
+    shown: list[Entry] = []
+    for entry in entries:
+        if shown and len(compose([*shown, entry])) > max_length:
+            posts.append(compose(shown))
+            shown = []
+        shown.append(entry)
+    return [*posts, compose(shown)]
+
+
+def weekend(
+    events: list[Entry],
+    saved: State | None,
+    today: date,
+    post: Post,
+    save: Callable[[State], None],
+    site: str,
+    max_length: int = MAX_LENGTH["mastodon"],
+) -> None:
+    """Thursday's posts: the concerts from Friday to Sunday, one per genre, followed by the fans of the style.
+    A band in two genres is in both; a band without genre in "Concerts this weekend". At most PER_HOUR posts a
+    run, a genre's thread never cut: the next run goes on, and the state remembers the genres done."""
+    friday = today + timedelta(days=4 - today.weekday())  # this week's
+    if not saved or saved["weekend"] != friday.isoformat():
+        saved = {"weekend": friday.isoformat(), "done": []}
+    state = saved
+    days = {(friday + timedelta(days=n)).isoformat() for n in range(3)}
+    genres: dict[str, list[Entry]] = {}
+    for entry in sorted(events, key=lambda entry: entry["event"]["startDate"]):
+        if entry["event"]["startDate"][:10] in days and not is_cancelled(entry):
+            for genre in entry["band"].get("genres") or [""]:
+                genres.setdefault(genre, []).append(entry)
+    left = PER_HOUR
+    for genre, entries in genres.items():
+        if genre in state["done"]:
+            continue
+        thread = weekend_posts(genre, entries, site, max_length)
+        # Wait for the next run when this thread does not fit in what is left of the hour, unless nothing was
+        # posted yet: a thread longer than PER_HOUR must go out some time
+        if len(thread) > left and left < PER_HOUR:
+            break
+        # The rest of the thread replies to its first post
+        first = post(thread[0], None)
+        for text in thread[1:]:
+            post(text, first)
+        left -= len(thread)
+        state["done"].append(genre)
+        save(state)
+    save(state)
+
+
 def mastodon_post(client: httpx.Client) -> Post:
     url = os.environ["MASTODON_URL"].rstrip("/") + "/api/v1/statuses"
     token = os.environ["MASTODON_TOKEN"]
@@ -291,10 +359,10 @@ def read_env_file() -> None:
                 os.environ.setdefault(name.strip(), value.strip())
 
 
-def main(network: str, transport: httpx.BaseTransport | None = None) -> None:
+def main(network: str, transport: httpx.BaseTransport | None = None, weekend_post: bool = False) -> None:
     read_env_file()
     site = os.environ["BOT_SITE_URL"].rstrip("/")
-    state_file = ROOT / f"{network}_bot.json"
+    state_file = ROOT / f"{network}_{'weekend' if weekend_post else 'bot'}.json"
     state = json.loads(state_file.read_text()) if state_file.exists() else None
     headers = {"User-Agent": f"OTR-{network}-bot/0.1 (+{site})"}
     poster, secret = POSTERS[network]
@@ -309,23 +377,29 @@ def main(network: str, transport: httpx.BaseTransport | None = None) -> None:
         events = response.json()
         modified = response.headers.get("Last-Modified", "")
         now = datetime.now().astimezone()
-        if not os.environ.get(secret):
-            # Trying it out: show what would be posted, remember nothing. Without a state yet, as if every date
-            # were new, to see the posts
-            def show(text: str, reply_to: str | None) -> str:
-                print(f"--- {'reply to ' + reply_to if reply_to else 'post'}\n{text}\n")
-                return "dry-run"
+        sending = bool(os.environ.get(secret))
 
-            run(events, state or {"concerts": {}, "posted": []}, now, show, lambda state: None, "", max_length)
-            return
+        # Trying it out, without the secret: show what would be posted, remember nothing
+        def show(text: str, reply_to: str | None) -> str:
+            print(f"--- {'reply to ' + reply_to if reply_to else 'post'}\n{text}\n")
+            return "dry-run"
 
         def save(state: State) -> None:
-            state_file.write_text(json.dumps(state))
+            if sending:
+                state_file.write_text(json.dumps(state))
 
-        run(events, state, now, poster(client), save, modified, max_length)
+        post = poster(client) if sending else show
+        if not sending:
+            # Without a state yet, as if every date were new, to see the posts
+            state = state if weekend_post else state or {"concerts": {}, "posted": []}
+            modified = ""
+        if weekend_post:
+            weekend(events, state, now.date(), post, save, site, max_length)
+        else:
+            run(events, state, now, post, save, modified, max_length)
 
 
 if __name__ == "__main__":
-    if sys.argv[1:] not in (["mastodon"], ["bluesky"]):
-        sys.exit("Usage: python integrations/bot.py mastodon|bluesky")
-    main(sys.argv[1])
+    if sys.argv[1:] not in (["mastodon"], ["bluesky"], ["mastodon", "weekend"], ["bluesky", "weekend"]):
+        sys.exit("Usage: python integrations/bot.py mastodon|bluesky [weekend]")
+    main(sys.argv[1], weekend_post=sys.argv[2:] == ["weekend"])
