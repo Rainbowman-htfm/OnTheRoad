@@ -1,7 +1,7 @@
 """Mastodon and Bluesky bot for an On the Road site: announces the new concert dates an hour after they are
-entered, one post per band with hashtags for the cities, and replies to its post when a date is cancelled or
-moved. Like any tool built over the open data, it only reads the site's public /events.json, and remembers what
-it posted in a small JSON file of its own, one per network.
+entered, one post per band with hashtags for its genres and the cities, and replies to its post when a date is
+cancelled or moved. Like any tool built over the open data, it only reads the site's public /events.json, and
+remembers what it posted in a small JSON file of its own, one per network.
 
 Run it every 15 minutes, once per network:  python integrations/bot.py mastodon
                                             python integrations/bot.py bluesky
@@ -88,8 +88,10 @@ def announcement(entries: list[Entry], max_length: int) -> str:
 
     def compose(shown: list[Entry], more: list[str]) -> str:
         cities = (entry["event"]["location"]["address"]["addressLocality"] for entry in shown)
-        # The band, then each city once, in date order
-        tags = dict.fromkeys(["#concert", hashtag(band["name"]), *(hashtag(city) for city in cities)])
+        # The band, its genres (followed by fans of the style anywhere), then each city once, in date order;
+        # band.get(): a site from before genres has none
+        genres = [hashtag(genre) for genre in band.get("genres", [])]
+        tags = dict.fromkeys(["#concert", hashtag(band["name"]), *genres, *(hashtag(city) for city in cities)])
         return "\n".join([title, "", *map(line, shown), *more, "", *end, "", " ".join(tag for tag in tags if tag)])
 
     shown: list[Entry] = []

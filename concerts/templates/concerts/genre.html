@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ genre.name }} – upcoming concerts</title>
+<meta name="description" content="Upcoming concerts of the {{ genre.name }} bands on On the Road">
+<link rel="alternate" type="application/rss+xml" title="{{ genre.name }} – upcoming concerts" href="concerts.xml">
+{% include "concerts/_style.html" %}
+<style>
+body { max-width: 60rem; margin: 0 auto; padding: 1rem; }
+h1 { margin: 0; }
+.unclaimed { font-size: .9em; opacity: .8; }
+</style>
+</head>
+<body>
+<h1>{{ genre.name }}</h1>
+<p class="muted">Upcoming concerts of {% for band in bands %}<a href="../../{{ band.slug }}/">{{ band.name }}</a>{% if not forloop.last %}, {% endif %}{% endfor %}</p>
+{% if unclaimed %}<p class="unclaimed">Dates of bands that don't manage their own page are listed by On the Road, from the bands' public announcements.</p>{% endif %}
+<div>{% include "concerts/_calendar_menu.html" %} · <a href="concerts.xml">RSS</a></div>
+{% if concerts %}
+{% include "concerts/_concert_list.html" with show_band=True %}
+{% else %}
+<p>No upcoming concerts.</p>
+{% endif %}
+{% include "concerts/_osm_credit.html" %}
+<p class="credit"><a href="../../data.html">Your data</a> · <a href="../../">On the Road</a></p>
+</body>
+</html>

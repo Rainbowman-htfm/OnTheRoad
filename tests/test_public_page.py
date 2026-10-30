@@ -9,7 +9,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from concerts import public
-from concerts.models import Account, Band, Concert, Venue
+from concerts.models import Account, Band, Concert, Genre, Venue
 
 pytestmark = pytest.mark.django_db
 
@@ -103,8 +103,9 @@ def test_query_count_does_not_grow_with_concerts(band, venue, django_assert_num_
     for days in range(1, 6):
         add_concert(band, venue, days=days)
     # The upcoming concerts with their venues and their other bands, the band's links, whether it has members,
-    # every concert for the calendar with their other bands, the past shows (none: their other bands not asked)
-    with django_assert_num_queries(7):
+    # every concert for the calendar with their other bands, the past shows (none: their other bands not asked),
+    # its genres
+    with django_assert_num_queries(8):
         public.build_band(band)
 
 
@@ -174,7 +175,7 @@ def test_home_page_bands_sorted_by_next_show(band, venue, public_dir):
 
 
 def test_calendar_choices(band):
-    links = public.calendar_links(band)
+    links = public.calendar_links(public.page_url(band), band.name)
     feed = public.page_url(band) + "concerts.ics"
     assert links["feed"] == feed
     assert links["apple"] == "webcal://" + feed.split("://")[1]
@@ -293,3 +294,36 @@ def test_past_shows_folded_latest_first_without_cancelled(band, venue):
 def test_no_past_shows_no_section(band, venue):
     add_concert(band, venue, days=3)
     assert '<details class="past">' not in page(band)
+
+
+def test_genre_page_lists_its_bands_concerts_with_their_feeds(
+    band, venue, public_dir, django_capture_on_commit_callbacks
+):
+    metal = Genre.objects.create(name="Metal", slug="metal")
+    add_concert(band, venue, days=3, ticket_url="https://tickets.example/1")
+    add_concert(Band.objects.create(name="Splenius", slug="splenius"), venue, days=5)
+    with django_capture_on_commit_callbacks(execute=True):
+        band.genres.add(metal)  # ticked on its page: the pages are rebuilt
+    folder = public_dir / "genre" / "metal"
+    page = (folder / "index.html").read_text()
+    assert '<a href="../../damantra/">Damantra</a>' in page and "Splenius" not in page
+    assert 'Tickets<span class="sr">, Damantra, ' in page  # which band, for screen readers
+    assert "listed by On the Road" in page  # Damantra does not manage its page
+    assert "webcal://" in page and 'href="concerts.xml"' in page
+    assert "Damantra at " in (folder / "concerts.ics").read_text()
+    assert "<title>Metal – upcoming concerts</title>" in (folder / "concerts.xml").read_text()
+    assert 'href="genre/metal/">Metal</a>' in (public_dir / "index.html").read_text()
+    assert 'href="../genre/metal/">Metal</a>' in (public_dir / "damantra" / "index.html").read_text()
+    public.build_all()
+    assert (folder / "index.html").exists()  # not taken for the folder of a deleted band
+    with django_capture_on_commit_callbacks(execute=True):
+        metal.bands.clear()  # no band left: no page
+    assert not folder.exists()
+    assert "genre/metal" not in (public_dir / "damantra" / "index.html").read_text()
+    with django_capture_on_commit_callbacks(execute=True):
+        band.genres.add(metal)
+    with django_capture_on_commit_callbacks(execute=True):
+        metal.delete()
+    assert not folder.exists()
+    assert "genre/metal" not in (public_dir / "index.html").read_text()
+    assert "genre/metal" not in (public_dir / "damantra" / "index.html").read_text()

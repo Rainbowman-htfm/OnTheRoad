@@ -5,11 +5,11 @@ from collections.abc import Iterable
 from typing import Any
 
 from django.db import transaction
-from django.db.models.signals import post_delete, post_save, pre_delete
+from django.db.models.signals import m2m_changed, post_delete, post_save, pre_delete
 from django.dispatch import receiver
 
 from . import public
-from .models import Band, BandLink, Concert, Event, Membership, OtherBand, Venue
+from .models import Band, BandLink, Concert, Event, Genre, Membership, OtherBand, Venue
 
 # The bands waiting to be rebuilt: one save in the admin sends many signals (the concert, each of its other
 # bands…), each page is still built once. One set per thread, so two saves at the same time do not mix
@@ -80,3 +80,28 @@ def other_band_changed(sender: type[OtherBand], instance: OtherBand, **kwargs: A
 @receiver(post_save, sender=Event)
 def venue_saved(sender: type[Venue | Event], instance: Venue | Event, **kwargs: Any) -> None:
     rebuild(instance.concerts.values_list("band_id", flat=True).distinct())
+
+
+@receiver(m2m_changed, sender=Band.genres.through)
+def genres_changed(
+    sender: type[Any], instance: Band | Genre, action: str, pk_set: set[int] | None, **kwargs: Any
+) -> None:
+    # Ticked on a band's page (instance is the band), or changed from the genre's side (genre.bands.add(), the
+    # bands in pk_set); clear() gives no pk_set, so its bands are read before. The genre pages are rebuilt with
+    # the home page
+    if isinstance(instance, Band) and action in ("post_add", "post_remove", "post_clear"):
+        rebuild([instance.pk])
+    elif isinstance(instance, Genre) and action in ("post_add", "post_remove"):
+        rebuild(pk_set or [])
+    elif isinstance(instance, Genre) and action == "pre_clear":
+        rebuild(instance.bands.values_list("pk", flat=True))
+
+
+@receiver(post_save, sender=Genre)
+@receiver(pre_delete, sender=Genre)
+def genre_changed(sender: type[Genre], instance: Genre, **kwargs: Any) -> None:
+    # Its name is on its bands' pages; before a deletion, while its bands are still known
+    if band_ids := list(instance.bands.values_list("pk", flat=True)):
+        rebuild(band_ids)
+    else:
+        transaction.on_commit(public.build_home)

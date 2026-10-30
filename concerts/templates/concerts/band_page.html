@@ -23,6 +23,7 @@ footer { opacity: .7; }
 <body>
 <h1>{{ band.name }}</h1>
 {% if not claimed %}<p class="unclaimed">This page is maintained by On the Road, not by the band.{% if unclaimed_links.claim %} Are you in this band? <a href="{{ unclaimed_links.claim }}">Claim this page</a>.{% endif %}</p>{% endif %}
+{% if genres %}<p class="genres">{% for genre in genres %}<a href="../genre/{{ genre.slug }}/">{{ genre.name }}</a>{% if not forloop.last %} · {% endif %}{% endfor %}</p>{% endif %}
 <p class="muted">Upcoming concerts{% if band.checked_at %} · Dates checked on {{ band.checked_at|date:"j M Y" }}{% endif %}</p>
 {# A div, not in the muted line: a <p> cannot hold the menu, and the line's transparency would show through it #}
 <div>{% include "concerts/_calendar_menu.html" %} · <a href="concerts.xml">RSS</a></div>

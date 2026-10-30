@@ -50,12 +50,27 @@ hex_color = RegexValidator(r"^#[0-9a-fA-F]{6}$", "Enter a colour like #c4161c.")
 
 
 # Addresses used by the site itself: a band page there would be hidden by it (config/urls.py)
-RESERVED_SLUGS = {"admin", "login", "static"}
+RESERVED_SLUGS = {"admin", "login", "static", "genre"}
 
 
 def reserved_slug(value: str) -> None:
     if value in RESERVED_SLUGS:
         raise ValidationError("This address is used by the site itself; choose another one.")
+
+
+class Genre(models.Model):
+    """A broad genre ("metal", "rock") grouping bands for their fans. A short list kept by the administrator,
+    not typed by each band: "Metal" and "métal" would become two genres. Its own table rather than text on
+    the band, as it is filtered on, and each instance keeps its own list."""
+
+    name = models.CharField(max_length=50, unique=True)
+    slug = models.SlugField(max_length=50, unique=True, help_text="Genre page address: /genre/<slug>/")
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self) -> str:
+        return self.name
 
 
 class Band(models.Model):
@@ -92,6 +107,8 @@ class Band(models.Model):
     font = models.CharField(max_length=10, choices=Font.choices, default=Font.SANS)
     corners = models.CharField(max_length=10, choices=Corners.choices, default=Corners.SLIGHT)
     members = models.ManyToManyField(settings.AUTH_USER_MODEL, through="Membership", related_name="bands", blank=True)
+    # Often two or three: a band between rock and metal is on both pages. Django creates the link table
+    genres = models.ManyToManyField(Genre, related_name="bands", blank=True)
     # Last save of the band or one of its concerts in the admin: whoever saves has just checked its dates, even
     # without changing anything. Shown on the band's page: how fresh its dates are, whoever keeps them
     checked_at = models.DateTimeField("dates checked", null=True, blank=True, editable=False)

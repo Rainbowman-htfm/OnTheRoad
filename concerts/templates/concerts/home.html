@@ -41,6 +41,7 @@ footer { margin-top: 2rem; font-size: .9em; }
 {% endif %}
 
 <h2>Bands</h2>
+{% if genres %}<p>By genre, with their own calendar: {% for genre in genres %}<a href="genre/{{ genre.slug }}/">{{ genre.name }}</a>{% if not forloop.last %} · {% endif %}{% endfor %}</p>{% endif %}
 {% if bands %}
 <ul class="bands">
 {% for item in bands %}<li>
