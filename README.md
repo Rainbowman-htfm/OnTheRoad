@@ -59,7 +59,9 @@ Run `manage.py build` every night: it rebuilds all public pages, so "upcoming" s
 over an instance. `integrations/bot.py` is one: Mastodon and Bluesky accounts announcing the new dates, one post
 per band, and replying when a date is cancelled or moved. It only reads `/events.json`, so it can follow any
 instance. Run it every 15 minutes for each network (`python integrations/bot.py mastodon`, then `bluesky`); its
-settings are at the top of the file, and without a token or app password it only prints what it would post.
+settings are at the top of the file, and without a token or app password it only prints what it would post. With
+`weekend` after the network, run on Thursdays hourly from 18:00 to 21:00, it posts the weekend's concerts, one
+post per genre.
 
 ## Development
 

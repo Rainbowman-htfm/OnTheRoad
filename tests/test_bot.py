@@ -1,7 +1,7 @@
 """The bot, from the site's /events.json to its posts; Mastodon and Bluesky are faked with httpx.MockTransport."""
 
 import json
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any
 from urllib.parse import parse_qs
 
@@ -296,3 +296,80 @@ def test_main_posts_to_bluesky_and_replies_in_the_thread(monkeypatch, tmp_path):
     _, _, reply = requests  # signed in again: a new run
     announced = {"uri": "at://did:plc:bot/app.bsky.feed.post/3", "cid": "cid"}
     assert json.loads(reply.content)["record"]["reply"] == {"root": announced, "parent": announced}
+
+
+def weekend_concert(number: int, band: str, start: str, genres: list[str], **event: Any):
+    entry = concert(number, band=band, start=start, **event)
+    entry["band"]["genres"] = genres
+    return entry
+
+
+THURSDAY = datetime.fromisoformat("2026-11-05T18:00:00+01:00").date()
+
+
+def test_weekend_one_post_per_genre_friday_to_sunday():
+    events = [
+        weekend_concert(
+            1,
+            "Encounters",
+            "2026-11-07T20:00:00+01:00",
+            ["Metal"],
+            location={"name": "Glazart", "address": {"addressLocality": "Paris"}},
+        ),
+        weekend_concert(2, "Encounters", "2026-11-06", ["Metal"], superEvent={"name": "UNFEST"}),
+        weekend_concert(3, "Feat the Sun", "2026-11-08T19:00:00+01:00", ["Rock", "Metal"]),
+        weekend_concert(4, "Splenius", "2026-11-05T20:00:00+01:00", ["Metal"]),  # Thursday: not the weekend
+        weekend_concert(5, "Splenius", "2026-11-09T20:00:00+01:00", ["Metal"]),  # Monday
+        weekend_concert(6, "Arhsia", "2026-11-07", ["Metal"], eventStatus="https://schema.org/EventCancelled"),
+        weekend_concert(7, "MADAM", "2026-11-07", []),
+    ]
+    bot = Fake()
+    site_bot.weekend(events, None, THURSDAY, bot.post, bot.save, "https://dates.example")
+    metal, other, rock = [text for text, _ in bot.posts]
+    assert metal == (
+        "Metal this weekend\n\nFri 6 Nov – Encounters at UNFEST, Orléans\n"
+        "Sat 7 Nov, 20:00 – Encounters at Glazart, Paris\nSun 8 Nov, 19:00 – Feat the Sun at Le Bouillon, Orléans\n\n"
+        "https://dates.example/\n\n#concert #Metal #Orleans #Paris"
+    )
+    assert other.startswith("Concerts this weekend\n\nSat 7 Nov – MADAM at")
+    assert other.endswith("\n\n#concert #Orleans")  # no genre, no genre hashtag
+    assert rock.startswith("Rock this weekend\n\nSun 8 Nov, 19:00 – Feat the Sun")
+    # Run again, the same weekend: nothing posted twice
+    site_bot.weekend(events, bot.state, THURSDAY, bot.post, bot.save, "https://dates.example")
+    assert len(bot.posts) == 3
+
+
+def test_weekend_too_long_a_thread_and_the_rest_at_the_next_run():
+    metal = [weekend_concert(n, "Encounters", "2026-11-07", ["Metal"]) for n in range(1, 21)]
+    rock = [weekend_concert(n, "Feat the Sun", "2026-11-07", ["Rock"]) for n in range(21, 23)]
+    bot = Fake()
+    site_bot.weekend([*metal, *rock], None, THURSDAY, bot.post, bot.save, "https://dates.example", 300)
+    assert all(len(text) <= 300 for text, _ in bot.posts)
+    # Metal's thread replies to its first post; Rock waits, the hour's posts are used
+    assert [reply_to for _, reply_to in bot.posts] == [None, "post-1", "post-1", "post-1", "post-1"]
+    assert sum(text.count("Encounters") for text, _ in bot.posts) == 20
+    site_bot.weekend([*metal, *rock], bot.state, THURSDAY, bot.post, bot.save, "https://dates.example", 300)
+    assert bot.posts[5][0].startswith("Rock this weekend") and len(bot.posts) == 6
+    # Next week starts over
+    site_bot.weekend([], bot.state, date(2026, 11, 12), bot.post, bot.save, "https://dates.example", 300)
+    assert bot.state == {"weekend": "2026-11-13", "done": []}
+
+
+def test_main_weekend_has_its_own_state(monkeypatch, tmp_path):
+    mastodon_settings(monkeypatch)
+    (tmp_path / "mastodon_bot.json").write_text(json.dumps({"concerts": {}, "posted": [], "modified": "x"}))
+    monkeypatch.setattr(
+        site_bot, "datetime", type("Clock", (datetime,), {"now": staticmethod(lambda: datetime(2026, 11, 5, 18))})
+    )
+    sent: list[str] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.host == "dates.example":
+            assert "If-Modified-Since" not in request.headers
+            return httpx.Response(200, json=[weekend_concert(1, "Encounters", "2026-11-07", ["Metal"])])
+        sent.append(parse_qs(request.content.decode())["status"][0])
+        return httpx.Response(200, json={"id": "110"})
+
+    site_bot.main("mastodon", httpx.MockTransport(handler), weekend_post=True)
+    assert sent[0].startswith("Metal this weekend")
+    assert json.loads((tmp_path / "mastodon_weekend.json").read_text()) == {"weekend": "2026-11-06", "done": ["Metal"]}

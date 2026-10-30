@@ -10,3 +10,6 @@ staticfiles/
 # What the bot posted on each network (integrations/bot.py)
 mastodon_bot.json
 bluesky_bot.json
+# The weekend posts (bot.py … weekend)
+mastodon_weekend.json
+bluesky_weekend.json
