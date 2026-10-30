@@ -45,6 +45,7 @@ footer { opacity: .7; }
 {% endif %}
 {% include "concerts/_osm_credit.html" %}
 {% if unclaimed_links.help %}<p class="credit"><a href="{{ unclaimed_links.help }}">Help keep these dates up to date</a> · <a href="{{ unclaimed_links.remove }}">Remove this page</a></p>{% endif %}
+{% include "concerts/_follow.html" with small=True %}
 <p class="credit"><a href="../data.html">Your data</a> · <a href="../">On the Road</a></p>
 {% include "concerts/_near_me.html" %}
 </body>

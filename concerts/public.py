@@ -83,6 +83,11 @@ def osm_credit(concerts: list[Concert]) -> str:
     return "all" if from_osm and all(from_osm) else "some" if any(from_osm) else ""
 
 
+def follow_links() -> dict[str, str]:
+    """The site's own accounts announcing new dates (integrations/bot.py); empty when not set."""
+    return {"mastodon": settings.MASTODON_PROFILE, "bluesky": settings.BLUESKY_PROFILE}
+
+
 def calendar_links(page: str, name: str) -> dict[str, str]:
     """Ways to subscribe to a band's or a genre's calendar, next to its page: the site cannot know which
     calendar a fan uses."""
@@ -315,6 +320,7 @@ def band_page(band: Band, concerts: list[Concert], band_links: list[str], claime
             "osm_credit": osm_credit(concerts + past),
             "claimed": claimed,
             "unclaimed_links": {} if claimed else unclaimed_links(band),
+            "follow": follow_links(),
         },
     )
 
@@ -552,6 +558,7 @@ def build_genres() -> None:
                 "calendar": calendar_links(genre_url(genre), genre.name),
                 "new_since": new_since(),
                 "osm_credit": osm_credit(upcoming),
+                "follow": follow_links(),
             },
         )
         (folder / "index.html").write_text(html, encoding="utf-8")
@@ -579,8 +586,7 @@ def build_home() -> None:
             "osm_credit": osm_credit(shown),
             "contact": settings.CONTACT_EMAIL,
             "source": settings.SOURCE_URL,
-            "mastodon": settings.MASTODON_PROFILE,
-            "bluesky": settings.BLUESKY_PROFILE,
+            "follow": follow_links(),
             "suggest": mailto(
                 "Suggest a band",
                 "Band:\nCity:\nOfficial link (website, Instagram…):\n\n"
