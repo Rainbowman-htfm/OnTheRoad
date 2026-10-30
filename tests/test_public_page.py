@@ -213,6 +213,16 @@ def test_home_page_links_the_accounts_only_when_configured(public_dir, settings)
     assert 'Mastodon</a> · <a href="https://bsky.app/profile/dates.example">Bluesky</a>' in page
 
 
+def test_band_and_genre_pages_link_the_accounts_without_rel_me(band, public_dir, settings):
+    settings.MASTODON_PROFILE = "https://mastodon.example/@dates"
+    band.genres.add(Genre.objects.create(name="Metal", slug="metal"))
+    public.build_all()
+    for page in [public_dir / "damantra" / "index.html", public_dir / "genre" / "metal" / "index.html"]:
+        html = page.read_text()
+        assert 'On the Road posts new dates as they\'re announced: <a href="https://mastodon.example/@dates">' in html
+        assert 'rel="me" href="https://mastodon.example' not in html  # the band's own links are rel="me" here
+
+
 def test_your_data_page_is_linked_and_kept_by_the_nightly_build(band, public_dir):
     public.build_all()
     page = (public_dir / "data.html").read_text()
