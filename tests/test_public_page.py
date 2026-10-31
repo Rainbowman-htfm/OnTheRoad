@@ -85,6 +85,13 @@ def test_music_event_block(band, venue):
     assert "offers" not in cancelled
 
 
+def test_music_event_genres(band, venue):
+    band.genres.add(Genre.objects.create(name="Metal", slug="metal"), Genre.objects.create(name="Rock", slug="rock"))
+    add_concert(band, venue, days=1)
+    [event] = json_ld_blocks(page(band))
+    assert sorted(event["performer"]["genre"]) == ["Metal", "Rock"]
+
+
 def test_venue_name_links_to_its_website(band, venue, public_dir):
     other = Venue.objects.create(name="Le Gibus", city="Paris")
     venue.website = "https://leplan.com"

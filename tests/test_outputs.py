@@ -58,6 +58,11 @@ def test_calendar_keeps_past_and_cancelled_concerts(site, band, venue):
     assert event.decoded("dtstart") == cancelled.starts_at.replace(microsecond=0)  # iCal keeps whole seconds
 
 
+def test_calendar_asks_to_be_checked_every_six_hours(site, band):
+    ics = built(site, band, "concerts.ics")
+    assert "REFRESH-INTERVAL;VALUE=DURATION:PT6H" in ics and "X-PUBLISHED-TTL:PT6H" in ics
+
+
 def test_end_time_in_calendar_and_music_event(site, band, venue):
     concert = add_concert(band, venue, days=3)
     concert.ends_at = concert.starts_at + timedelta(hours=3)
