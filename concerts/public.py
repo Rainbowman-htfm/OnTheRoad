@@ -168,10 +168,11 @@ OTHER_BANDS = "other_bands__band"
 
 
 def upcoming_concerts(band: Band) -> QuerySet[Concert]:
+    # The band's genres for music_event(), loaded once: the concerts share the band
     return (
         band.concerts.filter(starts_at__gte=start_of_today())
         .select_related("venue", "event")
-        .prefetch_related(OTHER_BANDS)
+        .prefetch_related(OTHER_BANDS, "band__genres")
     )
 
 
@@ -244,6 +245,8 @@ def music_event(concert: Concert, same_as: list[str]) -> dict[str, Any]:
         performer["url"] = band.website
     if same_as:
         performer["sameAs"] = same_as
+    if genres := [genre.name for genre in band.genres.all()]:
+        performer["genre"] = genres
     event: dict[str, Any] = {
         "@context": "https://schema.org",
         "@type": "MusicEvent",
@@ -387,6 +390,10 @@ def calendar(name: str, concerts: QuerySet[Concert], claimed: set[int]) -> bytes
     cal.add("prodid", "-//OTR//concert dates//EN")
     cal.add("version", "2.0")
     cal.add("x-wr-calname", f"{name} concerts")
+    # How often to check for changes, a hint read by Apple's and Microsoft's calendars (the standard's name, and
+    # theirs); Google's checks on its own schedule
+    cal.add("refresh-interval", timedelta(hours=6), parameters={"VALUE": "DURATION"})
+    cal.add("x-published-ttl", "PT6H")
     now = timezone.now()
     for concert in concerts.select_related("band", "venue", "event").prefetch_related(OTHER_BANDS):
         venue = concert.venue
