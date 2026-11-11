@@ -15,8 +15,8 @@
     <button type="submit">Search</button>
   </p>
 </form>
-<p class="help">A name, an address, or both. Searching by address also finds a venue mapped under another name, and gives the coordinates of a venue missing from the map.</p>
-{% if name or address %}
+<p class="help">A name, an address, or both. Searching by address also finds a venue mapped under another name, and gives the coordinates of a venue missing from the map. A city alone gives its centre, for a one-off venue: a festival in a field or a town centre.</p>
+{% if name or address or city %}
   {% if rows %}
   <table>
     <thead><tr><th>Name</th><th>Found on</th><th>Type</th><th>Address</th><th>City</th><th>Coordinates</th><th></th></tr></thead>

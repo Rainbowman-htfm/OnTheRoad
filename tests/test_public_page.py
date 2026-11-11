@@ -5,11 +5,12 @@ from datetime import timedelta
 from urllib.parse import urlencode
 
 import pytest
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
 from concerts import public
-from concerts.models import Account, Band, Concert, Genre, Venue
+from concerts.models import Account, Band, Concert, Event, Genre, Venue
 
 pytestmark = pytest.mark.django_db
 
@@ -344,3 +345,31 @@ def test_genre_page_lists_its_bands_concerts_with_their_feeds(
     assert not folder.exists()
     assert "genre/metal" not in (public_dir / "index.html").read_text()
     assert "genre/metal" not in (public_dir / "damantra" / "index.html").read_text()
+
+
+def test_one_off_venue_needs_no_name_and_several_can_share_a_town():
+    with pytest.raises(ValidationError):
+        Venue(city="Clisson").full_clean()
+    for _ in range(2):
+        venue = Venue(city="Clisson", one_off=True, latitude="47.087722", longitude="-1.281742")
+        venue.full_clean()
+        venue.save()
+    assert str(venue) == "One-off venue (Clisson)"
+
+
+def test_one_off_venue_shows_its_event_or_its_city(band, public_dir):
+    field = Venue.objects.create(city="Clisson", one_off=True)
+    festival = Event.objects.create(name="Hellfest")
+    add_concert(band, field, days=1, event=festival, ticket_url="https://tickets.example/1")
+    add_concert(band, field, days=2, ticket_url="https://tickets.example/2")
+    html = page(band)
+    assert '<span class="at"></span>' not in html  # no empty venue name next to the event's
+    assert 'Tickets<span class="sr">, Hellfest,' in html and 'Tickets<span class="sr">, Clisson,' in html
+    at_festival, in_town = json_ld_blocks(html)
+    assert at_festival["name"] == "Damantra at Hellfest" and at_festival["location"]["name"] == "Hellfest"
+    assert in_town["name"] == "Damantra at Clisson" and in_town["location"]["name"] == "Clisson"
+    public.build_band(band)
+    ics = (public_dir / "damantra" / "concerts.ics").read_text()
+    assert "SUMMARY:Damantra at Hellfest" in ics and "SUMMARY:Damantra at Clisson" in ics
+    rss = (public_dir / "damantra" / "concerts.xml").read_text()
+    assert "– Hellfest, Clisson" in rss and "– Clisson</title>" in rss  # the city once

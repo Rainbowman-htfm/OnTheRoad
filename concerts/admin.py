@@ -292,8 +292,8 @@ def popup_pick(request: HttpRequest, obj: Venue | Event) -> HttpResponse:
 
 @admin.register(Venue)
 class VenueAdmin(admin.ModelAdmin):
-    list_display = ["name", "city", "postal_code", "country"]
-    list_filter = ["country", "city"]
+    list_display = ["name", "city", "postal_code", "country", "one_off"]
+    list_filter = ["one_off", "country", "city"]
     search_fields = ["name", "city"]
     inlines = [VenueLinkInline]
     add_form_template = "admin/concerts/venue/add_form.html"
@@ -311,7 +311,7 @@ class VenueAdmin(admin.ModelAdmin):
 
     def find_venue(self, request: HttpRequest) -> HttpResponse:
         """Search MusicBrainz and OpenStreetMap by name, and OpenStreetMap by address, in one list; nothing is
-        saved here."""
+        saved here. A city alone gives its centre, for a one-off venue: a festival in a field or a town centre."""
         if not self.has_add_permission(request):
             raise PermissionDenied
         name, address, postal_code, city = (
@@ -330,7 +330,8 @@ class VenueAdmin(admin.ModelAdmin):
                 found_openstreetmap = openstreetmap.search_places(name, city)
             except openstreetmap.OpenStreetMapError as error:
                 messages.warning(request, str(error))
-        if address:
+        town_only = bool(city and not name and not address)
+        if address or town_only:
             try:
                 at_address = openstreetmap.search_address(address, postal_code, city)
             except openstreetmap.OpenStreetMapError as error:
@@ -360,6 +361,11 @@ class VenueAdmin(admin.ModelAdmin):
             fields = {key: value for key, value in result.items() if key != "type" and value}
             if not result["name"] and name:  # the address alone: the venue's name is the one searched for
                 fields["name"] = name
+            if town_only and not result.get("osm_id"):
+                # The town's centre, without the town's OpenStreetMap ID: several events can use the same town,
+                # and a one-off venue is never offered as "already added"
+                result["type"] = "town centre, one-off venue"
+                fields["one_off"] = "1"
             initial = urlencode(fields | popup)
             venue = known.get(mbid or "") or known.get(osm_id or "")
             venue_url = ""

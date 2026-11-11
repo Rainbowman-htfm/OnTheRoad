@@ -151,9 +151,15 @@ class Membership(models.Model):
 
 
 class Venue(models.Model):
-    """Shared between bands."""
+    """Shared between bands. A one-off venue is a place used for one event, a field or a town centre: it may
+    have no name, and then shows the concert's event, or the city."""
 
-    name = models.CharField(max_length=200)
+    name = models.CharField(max_length=200, blank=True, help_text="Can be left empty for a one-off venue.")
+    one_off = models.BooleanField(
+        "one-off venue",
+        default=False,
+        help_text="A field or a town centre, for a festival rather than a concert hall.",
+    )
     address = models.CharField(max_length=300, blank=True)
     city = models.CharField(max_length=100)
     postal_code = models.CharField(max_length=10, blank=True)
@@ -183,7 +189,12 @@ class Venue(models.Model):
 
     def __str__(self) -> str:
         # The country tells apart "Paris" in France and "Paris" in Texas
-        return f"{self.name} ({', '.join(part for part in (self.city, self.country) if part)})"
+        name = self.name or "One-off venue"
+        return f"{name} ({', '.join(part for part in (self.city, self.country) if part)})"
+
+    def clean(self) -> None:
+        if not self.name and not self.one_off:
+            raise ValidationError({"name": "A venue needs a name, unless it is a one-off venue."})
 
 
 class VenueLink(models.Model):
@@ -281,6 +292,11 @@ class Concert(models.Model):
 
     def __str__(self) -> str:
         return f"{self.band} — {self.venue} — {timezone.localtime(self.starts_at):%Y-%m-%d}"
+
+    def place_name(self) -> str:
+        """What the concert's place is called on the pages and feeds: its event, else its venue, else the city
+        of a one-off venue without a name."""
+        return (self.event.name if self.event else "") or self.venue.name or self.venue.city
 
     def other_band_names(self) -> list[str]:
         # .all() rather than a new query, so a prefetch_related("other_bands__band") is used

@@ -373,3 +373,8 @@ def test_main_weekend_has_its_own_state(monkeypatch, tmp_path):
     site_bot.main("mastodon", httpx.MockTransport(handler), weekend_post=True)
     assert sent[0].startswith("Metal this weekend")
     assert json.loads((tmp_path / "mastodon_weekend.json").read_text()) == {"weekend": "2026-11-06", "done": ["Metal"]}
+
+
+def test_one_off_venue_called_by_its_city_is_not_named_twice():
+    entry = concert(1, location={"name": "Clisson", "address": {"addressLocality": "Clisson"}})
+    assert site_bot.line(entry) == "Sat 14 Nov, 20:30 – Clisson"
