@@ -36,7 +36,7 @@ footer { opacity: .7; }
 {% if past %}
 <details class="past"><summary>Past shows ({{ past|length }})</summary>
 <ul>
-{% for concert in past %}<li><time datetime="{{ concert.starts_at|date:'Y-m-d' }}">{{ concert.starts_at|date:"j M Y" }}</time> · {% include "concerts/_venue.html" %}{% if concert.event %} ({{ concert.venue.name }}){% endif %}, {{ concert.venue.city }}{% if concert.other_band_links %} · <span class="muted">with {% for name, url in concert.other_band_links %}{% if url %}<a href="{{ url }}">{{ name }}</a>{% else %}{{ name }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% endif %}</li>
+{% for concert in past %}<li><time datetime="{{ concert.starts_at|date:'Y-m-d' }}">{{ concert.starts_at|date:"j M Y" }}</time> · {% include "concerts/_venue.html" %}{% if concert.event and concert.venue.name %} ({{ concert.venue.name }}){% endif %}{% if concert.place_name != concert.venue.city %}, {{ concert.venue.city }}{% endif %}{% if concert.other_band_links %} · <span class="muted">with {% for name, url in concert.other_band_links %}{% if url %}<a href="{{ url }}">{{ name }}</a>{% else %}{{ name }}{% endif %}{% if not forloop.last %}, {% endif %}{% endfor %}</span>{% endif %}</li>
 {% endfor %}</ul>
 </details>
 {% endif %}

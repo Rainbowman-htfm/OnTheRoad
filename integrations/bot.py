@@ -67,7 +67,9 @@ def place(entry: Entry) -> str:
     """ "Hellfest, Clisson": the event's name when it has one, as on the site."""
     event = entry["event"]
     name = event.get("superEvent", {}).get("name") or event["location"]["name"]
-    return f"{name}, {event['location']['address']['addressLocality']}"
+    city = event["location"]["address"]["addressLocality"]
+    # A one-off venue without a name or event is called by its city: not twice
+    return name if name == city else f"{name}, {city}"
 
 
 def line(entry: Entry) -> str:

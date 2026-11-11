@@ -1,6 +1,7 @@
 """One venue search across MusicBrainz and OpenStreetMap, and the OpenStreetMap credit on public pages."""
 
 import json
+import re
 from datetime import timedelta
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
@@ -197,3 +198,16 @@ def test_venue_found_by_name_and_by_address_is_listed_once(admin_client, network
         "/admin/concerts/venue/search/", {"name": "La Maroquinerie", "address": "23 rue Boyer", "city": "Paris"}
     ).content.decode()
     assert page.count("openstreetmap.org/node/1402597553") == 1
+
+
+def test_city_alone_gives_a_one_off_venue_at_the_town_centre(admin_client, network):
+    clisson = json.loads((FIXTURES / "nominatim_city_clisson.json").read_text())
+    network([], [clisson])  # no name: MusicBrainz is not asked
+    page = admin_client.get("/admin/concerts/venue/search/", {"city": "Clisson"}).content.decode()
+    assert "town centre, one-off venue" in page
+    use_url = page.split('class="button" href="')[1].split('"')[0].replace("&amp;", "&")
+    initial = parse_qs(urlparse(use_url).query)
+    assert initial["city"] == ["Clisson"] and initial["one_off"] == ["1"] and initial["latitude"] == ["47.087722"]
+    assert "osm_id" not in initial and "name" not in initial  # the town is not the venue
+    form = admin_client.get(use_url).content.decode()
+    assert re.search(r'<input type="checkbox" name="one_off"[^>]*checked', form)

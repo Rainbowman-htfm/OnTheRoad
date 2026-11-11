@@ -228,7 +228,8 @@ def music_event(concert: Concert, same_as: list[str]) -> dict[str, Any]:
         address["addressCountry"] = venue.country
     location: dict[str, Any] = {
         "@type": "MusicVenue",
-        "name": venue.name,
+        # Never empty: a one-off venue without a name is called by its event, or its city
+        "name": venue.name or concert.place_name(),
         "address": address,
     }
     if venue.latitude is not None and venue.longitude is not None:
@@ -252,7 +253,7 @@ def music_event(concert: Concert, same_as: list[str]) -> dict[str, Any]:
         "@type": "MusicEvent",
         # The same as the calendars' UID: a tool reading this recognises a concert even after its date changes
         "identifier": concert_uid(concert),
-        "name": f"{band.name} at {(concert.event or venue).name}",
+        "name": f"{band.name} at {concert.place_name()}",
         # A date alone when the time is not announced, which schema.org accepts
         "startDate": (
             timezone.localtime(concert.starts_at).date().isoformat()
@@ -409,7 +410,7 @@ def calendar(name: str, concerts: QuerySet[Concert], claimed: set[int]) -> bytes
             event.add("dtstart", concert.starts_at)
             if concert.ends_at:
                 event.add("dtend", concert.ends_at)
-        event.add("summary", f"{concert.band.name} at {(concert.event or venue).name}")
+        event.add("summary", f"{concert.band.name} at {concert.place_name()}")
         city = f"{venue.postal_code} {venue.city}".strip()
         event.add("location", ", ".join(part for part in (venue.name, venue.address, city) if part))
         event.add("status", ICAL_STATUS[concert.status])
@@ -448,9 +449,8 @@ def rss(concerts: list[Concert], claimed: set[int], band: Band | None = None, ge
     for concert in sorted(concerts, key=lambda concert: concert.announced_at, reverse=True):
         date = dateformat.format(timezone.localtime(concert.starts_at), "D j M Y")
         details = describe(concert)
-        title = f"{date} – {(concert.event or concert.venue).name}, {concert.venue.city}" + (
-            f" ({details})" if details else ""
-        )
+        place, city = concert.place_name(), concert.venue.city
+        title = f"{date} – {place if place == city else f'{place}, {city}'}" + (f" ({details})" if details else "")
         feed.add_item(
             title=title if band else f"{concert.band.name}: {title}",
             link=concert.ticket_url or page_url(concert.band),
