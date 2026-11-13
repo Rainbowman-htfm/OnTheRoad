@@ -79,11 +79,12 @@ def line(entry: Entry) -> str:
 
 def hashtag(name: str) -> str:
     """ "Saint-Pierre-lès-Elbeuf" → "#SaintPierreLesElbeuf", "Grandma's Ashes" → "#GrandmasAshes": a hashtag is
-    letters and digits only, and without accents it matches the way most people type it. "" without a letter,
-    "#1349" would not be a hashtag."""
-    plain = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode().replace("'", "")
-    tag = "".join(word[:1].upper() + word[1:] for word in re.split(r"[^A-Za-z0-9]+", plain))
-    return "#" + tag if re.search("[A-Za-z]", tag) else ""
+    letters and digits only, and without accents it matches the way most people type it. Letters that are not
+    accented ones stay: "AĦNA" → "#AĦNA", not "#ANA". "" without a letter, "#1349" would not be a hashtag."""
+    decomposed = unicodedata.normalize("NFKD", name.replace("'", "").replace("’", ""))
+    plain = "".join(c for c in decomposed if not unicodedata.combining(c))
+    tag = "".join(word[:1].upper() + word[1:] for word in re.split(r"[\W_]+", plain))
+    return "#" + tag if re.search(r"[^\W\d]", tag) else ""
 
 
 def announcement(entries: list[Entry], max_length: int) -> str:

@@ -88,6 +88,7 @@ def test_hashtags_one_per_city_without_accents_or_dashes():
     assert site_bot.hashtag("L'Isle-d'Abeau") == "#LIsleDAbeau"
     assert site_bot.hashtag("Grandma’s Ashes") == site_bot.hashtag("Grandma's Ashes") == "#GrandmasAshes"
     assert site_bot.hashtag("1349") == ""  # digits alone are not a hashtag
+    assert site_bot.hashtag("AĦNA") == "#AĦNA"  # Ħ is a letter of its own, not an accented H
     bot = Fake()
     bot.run([])
     paris = concert(2, location={"name": "Glazart", "address": {"addressLocality": "Paris"}})
